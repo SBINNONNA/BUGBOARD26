@@ -30,8 +30,20 @@ public class MembriDialog extends JDialog {
             public boolean isCellEditable(int r, int c) { return false; }
         };
         JTable table = new JTable(model);
-        table.setBackground(new Color(160, 110, 210));
-        table.setForeground(Color.WHITE);
+        // ← SOSTITUISCI le due righe dell'header con questo blocco
+        table.getTableHeader().setDefaultRenderer((tbl, val, sel, foc, row, col) -> {
+            JLabel lbl = new JLabel(val == null ? "" : val.toString(), SwingConstants.CENTER);
+            lbl.setFont(new Font("SansSerif", Font.BOLD, 13));
+            lbl.setForeground(Color.WHITE);
+            lbl.setBackground(new Color(100, 0, 170));
+            lbl.setOpaque(true);
+            lbl.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createMatteBorder(0, 0, 2, 1, new Color(130, 50, 200)),
+                    BorderFactory.createEmptyBorder(4, 8, 4, 8)
+            ));
+            return lbl;
+        });
+
         table.setFont(new Font("SansSerif", Font.PLAIN, 13));
         table.getTableHeader().setBackground(new Color(100, 0, 170));
         table.getTableHeader().setForeground(Color.WHITE);
