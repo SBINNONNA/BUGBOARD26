@@ -1,9 +1,11 @@
 package com.bugboard.bugboard26.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import java.time.LocalDateTime;
 
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})  // ← AGGIUNTO
 @Entity
 @Table(name = "comments")
 public class Comment {
@@ -26,7 +28,6 @@ public class Comment {
     @JoinColumn(name = "author_id", nullable = false)
     private User author;
 
-    // Getter e Setter
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

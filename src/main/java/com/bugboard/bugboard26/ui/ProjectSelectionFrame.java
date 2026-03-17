@@ -1,0 +1,330 @@
+package com.bugboard.bugboard26.ui;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import javax.swing.*;
+import javax.swing.border.*;
+import java.awt.*;
+import java.awt.event.*;
+
+public class ProjectSelectionFrame extends JFrame {
+
+    private static final Color BG         = new Color(155, 100, 215);
+    private static final Color SIDEBAR_BG = new Color(100, 0, 170);
+    private static final Color CARD_BG    = new Color(140, 80, 200);
+    private static final Color CARD_HOV   = new Color(160, 105, 225);
+    private static final Color PURPLE     = new Color(85, 0, 155);
+
+    private JPanel  cardsPanel;
+    private String  currentRole = "USER";
+
+    // ← campo diretto, non più cercato ricorsivamente
+    private final JButton newBtn;
+
+    public ProjectSelectionFrame() {
+        setTitle("BugBoard26 — Scegli progetto");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(1000, 680);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+        getContentPane().setBackground(BG);
+
+        // Inizializza newBtn PRIMA di buildContent()
+        newBtn = new JButton("＋ Nuovo Progetto");
+        newBtn.setBackground(PURPLE);
+        newBtn.setForeground(Color.WHITE);
+        newBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
+        newBtn.setFocusPainted(false);
+        newBtn.setBorderPainted(false);
+        newBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        newBtn.setVisible(false); // nascosto finché non sappiamo il ruolo
+        newBtn.addActionListener(e -> showCreateDialog());
+
+        add(buildTopBar(),  BorderLayout.NORTH);
+        add(buildContent(), BorderLayout.CENTER);
+
+        fetchRoleAndProjects();
+    }
+
+    // ─── TOP BAR ────────────────────────────────────────────
+    private JPanel buildTopBar() {
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(new Color(70, 0, 130));
+        bar.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+
+        JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        left.setOpaque(false);
+        left.add(new LogoPanel(false));
+        JLabel title = new JLabel("BugBoard26");
+        title.setFont(new Font("SansSerif", Font.BOLD, 20));
+        title.setForeground(Color.WHITE);
+        left.add(title);
+
+        JButton logout = new JButton("⬅ Logout");
+        logout.setBackground(new Color(75, 0, 130));
+        logout.setForeground(Color.WHITE);
+        logout.setFocusPainted(false);
+        logout.setBorderPainted(false);
+        logout.setFont(new Font("SansSerif", Font.BOLD, 12));
+        logout.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        logout.addActionListener(e -> {
+            ApiClient.setToken(null);
+            dispose();
+            new LoginFrame().setVisible(true);
+        });
+
+        bar.add(left,   BorderLayout.WEST);
+        bar.add(logout, BorderLayout.EAST);
+        return bar;
+    }
+
+    // ─── CONTENUTO ──────────────────────────────────────────
+    private JPanel buildContent() {
+        JPanel outer = new JPanel(new BorderLayout());
+        outer.setBackground(BG);
+        outer.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
+
+        // Header row con titolo e bottone nuovo progetto
+        JPanel headerRow = new JPanel(new BorderLayout());
+        headerRow.setOpaque(false);
+        headerRow.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
+
+        JLabel heading = new JLabel("Seleziona un progetto");
+        heading.setFont(new Font("SansSerif", Font.BOLD, 26));
+        heading.setForeground(new Color(50, 0, 90));
+
+        headerRow.add(heading, BorderLayout.WEST);
+        headerRow.add(newBtn,  BorderLayout.EAST); // newBtn già inizializzato nel costruttore
+
+        // Area card con WrapLayout
+        cardsPanel = new JPanel(new WrapLayout(FlowLayout.LEFT, 18, 18));
+        cardsPanel.setBackground(BG);
+
+        JScrollPane scroll = new JScrollPane(cardsPanel);
+        scroll.setBorder(null);
+        scroll.setOpaque(false);
+        scroll.getViewport().setOpaque(false);
+        scroll.getVerticalScrollBar().setUnitIncrement(16);
+
+        outer.add(headerRow, BorderLayout.NORTH);
+        outer.add(scroll,    BorderLayout.CENTER);
+        return outer;
+    }
+
+    // ─── CARICAMENTO ─────────────────────────────────────────
+    private void fetchRoleAndProjects() {
+        new SwingWorker<String[], Void>() {
+            @Override
+            protected String[] doInBackground() throws Exception {
+                String me       = ApiClient.get("/users/me");
+                String projects = ApiClient.get("/projects");
+                return new String[]{me, projects};
+            }
+
+            @Override
+            protected void done() {
+                try {
+
+                    String[] results = get();
+                    JsonNode me = ApiClient.mapper.readTree(results[0]);
+                    currentRole = me.path("role").asText("USER");
+
+                    // ← Ora funziona perché newBtn è un campo diretto
+                    // ✅ DOPO — gestisce ADMIN, ROLE_ADMIN, admin, ecc.
+                    String rawRole = "";
+
+// Prova il campo "role"
+                    if (me.has("role"))        rawRole = me.get("role").asText("");
+// Prova il campo "roles" (array)
+                    else if (me.has("roles"))  rawRole = me.get("roles").toString();
+// Prova il campo "authorities" (Spring Security)
+                    else if (me.has("authorities")) rawRole = me.get("authorities").toString();
+
+                    currentRole = rawRole.toUpperCase().contains("ADMIN") ? "ADMIN" : "USER";
+
+                    System.out.println(">>> ROLE RILEVATO: " + currentRole + " (raw: " + rawRole + ")");
+
+                    if ("ADMIN".equals(currentRole)) {
+                        newBtn.setVisible(true);
+                    }
+
+
+                    JsonNode arr = ApiClient.mapper.readTree(results[1]);
+                    cardsPanel.removeAll();
+
+                    if (arr.isEmpty()) {
+                        JLabel empty = new JLabel("Nessun progetto disponibile.");
+                        empty.setForeground(new Color(230, 210, 255));
+                        empty.setFont(new Font("SansSerif", Font.ITALIC, 15));
+                        cardsPanel.add(empty);
+                    } else {
+                        for (JsonNode p : arr) addProjectCard(p);
+                    }
+
+                    cardsPanel.revalidate();
+                    cardsPanel.repaint();
+                } catch (Exception ex) {
+                    JOptionPane.showMessageDialog(ProjectSelectionFrame.this,
+                            "Errore: " + ex.getMessage());
+                }
+            }
+        }.execute();
+    }
+
+    // ─── CARD PROGETTO ────────────────────────────────────────
+    private void addProjectCard(JsonNode project) {
+        Long   id   = project.get("id").asLong();
+        String name = project.get("name").asText();
+        String desc = project.path("description").asText("Nessuna descrizione");
+        String by   = project.path("createdBy").path("email").asText("—");
+
+        JPanel card = new JPanel(new BorderLayout(0, 8));
+        card.setBackground(CARD_BG);
+        card.setBorder(BorderFactory.createCompoundBorder(
+                new RoundedBorder(18, new Color(120, 60, 190)),
+                BorderFactory.createEmptyBorder(18, 20, 18, 20)
+        ));
+        card.setPreferredSize(new Dimension(240, 160));
+        card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        JLabel nameLbl = new JLabel(name);
+        nameLbl.setFont(new Font("SansSerif", Font.BOLD, 17));
+        nameLbl.setForeground(Color.WHITE);
+
+        JLabel descLbl = new JLabel(
+                "<html><body style='width:190px'>" + desc + "</body></html>");
+        descLbl.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        descLbl.setForeground(new Color(220, 195, 255));
+
+        JPanel footer = new JPanel(new BorderLayout());
+        footer.setOpaque(false);
+        JLabel byLbl = new JLabel("👤 " + by.split("@")[0]);
+        byLbl.setFont(new Font("SansSerif", Font.ITALIC, 11));
+        byLbl.setForeground(new Color(190, 155, 230));
+        footer.add(byLbl, BorderLayout.WEST);
+
+        if ("ADMIN".equals(currentRole)) {
+            JButton del = new JButton("🗑");
+            del.setBackground(new Color(160, 30, 60));
+            del.setForeground(Color.WHITE);
+            del.setFocusPainted(false);
+            del.setBorderPainted(false);
+            del.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+            del.addActionListener(e -> {
+                int ok = JOptionPane.showConfirmDialog(this,
+                        "Eliminare \"" + name + "\"?",
+                        "Conferma", JOptionPane.YES_NO_OPTION);
+                if (ok == JOptionPane.YES_OPTION) deleteProject(id);
+            });
+            footer.add(del, BorderLayout.EAST);
+        }
+
+        card.add(nameLbl, BorderLayout.NORTH);
+        card.add(descLbl, BorderLayout.CENTER);
+        card.add(footer,  BorderLayout.SOUTH);
+
+        card.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) { openProject(id, name); }
+            public void mouseEntered(MouseEvent e) { card.setBackground(CARD_HOV); }
+            public void mouseExited(MouseEvent e)  { card.setBackground(CARD_BG);  }
+        });
+
+        cardsPanel.add(card);
+    }
+
+    // ─── AZIONI ───────────────────────────────────────────────
+    private void openProject(Long id, String name) {
+        ApiClient.setCurrentProject(id, name);
+        dispose();
+        new DashboardFrame().setVisible(true);
+    }
+
+    private void showCreateDialog() {
+        JDialog dlg = new JDialog(this, "Nuovo Progetto", true);
+        dlg.setSize(380, 260);
+        dlg.setLocationRelativeTo(this);
+        dlg.getContentPane().setBackground(new Color(120, 60, 190));
+        dlg.setLayout(new GridBagLayout());
+
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(10, 12, 10, 12);
+        g.fill = GridBagConstraints.HORIZONTAL;
+
+        JTextField nameField = new JTextField(20);
+        JTextArea  descArea  = new JTextArea(3, 20);
+        styleField(nameField);
+        descArea.setBackground(new Color(160, 110, 215));
+        descArea.setForeground(Color.WHITE);
+        descArea.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        descArea.setBorder(BorderFactory.createLineBorder(new Color(190, 150, 240)));
+
+        g.gridx = 0; g.gridy = 0; g.gridwidth = 1;
+        JLabel nl = new JLabel("Nome:");
+        nl.setForeground(new Color(220, 195, 255));
+        nl.setFont(new Font("SansSerif", Font.BOLD, 12));
+        dlg.add(nl, g);
+        g.gridx = 1;
+        dlg.add(nameField, g);
+
+        g.gridx = 0; g.gridy = 1;
+        JLabel dl = new JLabel("Descrizione:");
+        dl.setForeground(new Color(220, 195, 255));
+        dl.setFont(new Font("SansSerif", Font.BOLD, 12));
+        dlg.add(dl, g);
+        g.gridx = 1;
+        dlg.add(new JScrollPane(descArea), g);
+
+        JButton save = new JButton("✔ Crea Progetto");
+        save.setBackground(PURPLE);
+        save.setForeground(Color.WHITE);
+        save.setFocusPainted(false);
+        save.setBorderPainted(false);
+        save.setFont(new Font("SansSerif", Font.BOLD, 13));
+        g.gridx = 0; g.gridy = 2; g.gridwidth = 2;
+        dlg.add(save, g);
+
+        save.addActionListener(e -> {
+            String n = nameField.getText().trim();
+            String d = descArea.getText().trim();
+            if (n.isEmpty()) {
+                JOptionPane.showMessageDialog(dlg, "Il nome è obbligatorio");
+                return;
+            }
+            try {
+                String json = String.format(
+                        "{\"name\":\"%s\",\"description\":\"%s\"}", n, d);
+                ApiClient.postAuth("/projects", json);
+                dlg.dispose();
+                fetchRoleAndProjects(); // ricarica la lista
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dlg, "Errore: " + ex.getMessage());
+            }
+        });
+
+        dlg.setVisible(true);
+    }
+
+    private void deleteProject(Long id) {
+        new SwingWorker<Void, Void>() {
+            @Override protected Void doInBackground() throws Exception {
+                java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create("http://localhost:8081/api/projects/" + id))
+                        .header("Authorization", "Bearer " + ApiClient.getToken())
+                        .DELETE().build();
+                client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+                return null;
+            }
+            @Override protected void done() { fetchRoleAndProjects(); }
+        }.execute();
+    }
+
+    private void styleField(JTextField f) {
+        f.setBackground(new Color(160, 110, 215));
+        f.setForeground(Color.WHITE);
+        f.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        f.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(190, 150, 240), 1, true),
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        ));
+    }
+}

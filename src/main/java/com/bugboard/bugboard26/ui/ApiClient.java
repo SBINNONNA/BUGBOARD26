@@ -11,13 +11,24 @@ import java.net.http.HttpResponse;
 
 public class ApiClient {
 
-    private static final String BASE_URL = "http://localhost:8080/api";
+    private static final String BASE_URL = "http://localhost:8081/api";
     private static final HttpClient client = HttpClient.newHttpClient();
     static final ObjectMapper mapper = new ObjectMapper()
             .registerModule(new JavaTimeModule())
             .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private static String token = null;
+    // Aggiungi questi campi e metodi
+    private static Long   currentProjectId   = null;
+    private static String currentProjectName = "";
+
+    public static void setCurrentProject(Long id, String name) {
+        currentProjectId   = id;
+        currentProjectName = name;
+    }
+    public static Long   getCurrentProjectId()   { return currentProjectId; }
+    public static String getCurrentProjectName() { return currentProjectName; }
+
 
     public static void setToken(String t) { token = t; }
     public static String getToken() { return token; }
@@ -39,8 +50,13 @@ public class ApiClient {
                 .header("Authorization", "Bearer " + token)
                 .POST(HttpRequest.BodyPublishers.ofString(json))
                 .build();
-        return client.send(request, HttpResponse.BodyHandlers.ofString()).body();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400) {
+            throw new RuntimeException("HTTP " + response.statusCode() + ": " + response.body());
+        }
+        return response.body();
     }
+
 
     public static String get(String path) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()

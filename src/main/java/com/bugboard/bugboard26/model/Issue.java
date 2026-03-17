@@ -1,10 +1,12 @@
 package com.bugboard.bugboard26.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.LocalDateTime;
 
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 @Entity
 @Table(name = "issues")
 public class Issue {
@@ -31,9 +33,9 @@ public class Issue {
     @Enumerated(EnumType.STRING)
     private Status status = Status.TODO;
 
-    private LocalDateTime deadline;        // requisito 18
+    private LocalDateTime deadline;
 
-    private String imageUrl;               // allegato immagine
+    private String imageUrl;
 
     @ManyToOne
     @JoinColumn(name = "created_by")
@@ -43,11 +45,14 @@ public class Issue {
     @JoinColumn(name = "assigned_to")
     private User assignedTo;
 
+    @ManyToOne                          // ← AGGIUNTA RELAZIONE PROGETTO
+    @JoinColumn(name = "project_id", nullable = false)
+    private Project project;
+
     public enum IssueType { BUG, QUESTION, FEATURE, DOCUMENTATION }
     public enum Priority  { LOW, MEDIUM, HIGH }
     public enum Status    { TODO, IN_PROGRESS, DONE }
 
-    // Getter e Setter
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -77,4 +82,7 @@ public class Issue {
 
     public User getAssignedTo() { return assignedTo; }
     public void setAssignedTo(User assignedTo) { this.assignedTo = assignedTo; }
+
+    public Project getProject() { return project; }
+    public void setProject(Project project) { this.project = project; }
 }

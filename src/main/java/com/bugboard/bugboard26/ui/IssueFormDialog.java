@@ -22,6 +22,11 @@ public class IssueFormDialog extends JDialog {
     private final JTextArea commentsArea = new JTextArea(4, 25);
     private final JTextField commentField = new JTextField(20);
 
+    // ← prefisso base per tutti gli endpoint di questo progetto
+    private String issueBase() {
+        return "/projects/" + ApiClient.getCurrentProjectId() + "/issues";
+    }
+
     public IssueFormDialog(Frame parent, Long issueId) {
         super(parent, issueId == null ? "Nuova Issue" : "Issue #" + issueId, true);
         this.issueId = issueId;
@@ -84,7 +89,8 @@ public class IssueFormDialog extends JDialog {
 
     private void loadIssue() {
         try {
-            String resp = ApiClient.get("/issues/" + issueId);
+            // ✅ PRIMA: /issues/{id}  →  ORA: /projects/{projectId}/issues/{id}
+            String resp = ApiClient.get(issueBase() + "/" + issueId);
             JsonNode n = ApiClient.mapper.readTree(resp);
             titleField.setText(n.get("title").asText());
             descArea.setText(n.path("description").asText());
@@ -99,7 +105,8 @@ public class IssueFormDialog extends JDialog {
 
     private void loadComments() {
         try {
-            String resp = ApiClient.get("/issues/" + issueId + "/comments");
+            // ✅ PRIMA: /issues/{id}/comments  →  ORA: /projects/{projectId}/issues/{id}/comments
+            String resp = ApiClient.get(issueBase() + "/" + issueId + "/comments");
             JsonNode arr = ApiClient.mapper.readTree(resp);
             StringBuilder sb = new StringBuilder();
             for (JsonNode c : arr) {
@@ -117,7 +124,8 @@ public class IssueFormDialog extends JDialog {
         if (text.isEmpty()) return;
         try {
             String json = String.format("{\"text\":\"%s\"}", text);
-            ApiClient.postAuth("/issues/" + issueId + "/comments", json);
+            // ✅ PRIMA: /issues/{id}/comments  →  ORA: /projects/{projectId}/issues/{id}/comments
+            ApiClient.postAuth(issueBase() + "/" + issueId + "/comments", json);
             commentField.setText("");
             loadComments();
         } catch (Exception ex) {
@@ -127,7 +135,7 @@ public class IssueFormDialog extends JDialog {
 
     private void save() {
         String title = titleField.getText().trim();
-        String desc = descArea.getText().trim();
+        String desc  = descArea.getText().trim();
         if (title.isEmpty()) {
             JOptionPane.showMessageDialog(this, "Il titolo è obbligatorio");
             return;
@@ -138,14 +146,16 @@ public class IssueFormDialog extends JDialog {
                         "{\"title\":\"%s\",\"description\":\"%s\",\"type\":\"%s\",\"priority\":\"%s\"}",
                         title, desc, typeBox.getSelectedItem(), priorityBox.getSelectedItem()
                 );
-                ApiClient.postAuth("/issues", json);
+                // ✅ PRIMA: /issues  →  ORA: /projects/{projectId}/issues
+                ApiClient.postAuth(issueBase(), json);
                 JOptionPane.showMessageDialog(this, "Issue creata!");
             } else {
                 String json = String.format(
                         "{\"title\":\"%s\",\"description\":\"%s\",\"status\":\"%s\"}",
                         title, desc, statusBox.getSelectedItem()
                 );
-                ApiClient.put("/issues/" + issueId, json);
+                // ✅ PRIMA: /issues/{id}  →  ORA: /projects/{projectId}/issues/{id}
+                ApiClient.put(issueBase() + "/" + issueId, json);
                 JOptionPane.showMessageDialog(this, "Issue aggiornata!");
             }
             dispose();

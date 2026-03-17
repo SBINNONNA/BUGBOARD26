@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/issues/{issueId}/comments")
+@RequestMapping("/api/projects/{projectId}/issues/{issueId}/comments") // ← AGGIORNATO
 public class CommentController {
 
     private final CommentService commentService;
@@ -24,6 +24,7 @@ public class CommentController {
     // Requisito 5 — Aggiungi commento
     @PostMapping
     public ResponseEntity<Comment> addComment(
+            @PathVariable Long projectId,   // ← AGGIUNTO (non usato ma richiesto dal path)
             @PathVariable Long issueId,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -35,7 +36,9 @@ public class CommentController {
 
     // Requisito 5 — Visualizza commenti
     @GetMapping
-    public ResponseEntity<List<Comment>> getComments(@PathVariable Long issueId) {
+    public ResponseEntity<List<Comment>> getComments(
+            @PathVariable Long projectId,   // ← AGGIUNTO
+            @PathVariable Long issueId) {
         return ResponseEntity.ok(commentService.getCommentsByIssue(issueId));
     }
 }

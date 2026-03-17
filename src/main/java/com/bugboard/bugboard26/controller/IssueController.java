@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/issues")
+@RequestMapping("/api/projects/{projectId}/issues")  // ← endpoint annidato nel progetto
 public class IssueController {
 
     private final IssueService issueService;
@@ -25,9 +25,11 @@ public class IssueController {
     // Requisito 2 — Crea issue
     @PostMapping
     public ResponseEntity<Issue> createIssue(
+            @PathVariable Long projectId,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal UserDetails userDetails) {
         Issue issue = issueService.createIssue(
+                projectId,
                 body.get("title"),
                 body.get("description"),
                 Issue.IssueType.valueOf(body.get("type").toUpperCase()),
@@ -40,25 +42,28 @@ public class IssueController {
     // Requisito 3 — Vista issue con filtri
     @GetMapping
     public ResponseEntity<List<Issue>> getIssues(
+            @PathVariable Long projectId,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority) {
-        Issue.IssueType issueType = type != null ? Issue.IssueType.valueOf(type.toUpperCase()) : null;
-        Issue.Status issueStatus = status != null ? Issue.Status.valueOf(status.toUpperCase()) : null;
-        Issue.Priority issuePriority = priority != null ? Issue.Priority.valueOf(priority.toUpperCase()) : null;
-        return ResponseEntity.ok(issueService.getIssues(keyword, issueType, issueStatus, issuePriority));
+        Issue.IssueType   issueType     = type     != null ? Issue.IssueType.valueOf(type.toUpperCase())     : null;
+        Issue.Status      issueStatus   = status   != null ? Issue.Status.valueOf(status.toUpperCase())      : null;
+        Issue.Priority    issuePriority = priority != null ? Issue.Priority.valueOf(priority.toUpperCase())  : null;
+        return ResponseEntity.ok(issueService.getIssues(projectId, keyword, issueType, issueStatus, issuePriority));
     }
 
     // Singola issue per ID
     @GetMapping("/{id}")
-    public ResponseEntity<Issue> getIssue(@PathVariable Long id) {
+    public ResponseEntity<Issue> getIssue(@PathVariable Long projectId,
+                                          @PathVariable Long id) {
         return ResponseEntity.ok(issueService.getIssueById(id));
     }
 
     // Requisito 9 — Modifica issue
     @PutMapping("/{id}")
     public ResponseEntity<Issue> updateIssue(
+            @PathVariable Long projectId,
             @PathVariable Long id,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -71,9 +76,10 @@ public class IssueController {
         return ResponseEntity.ok(updated);
     }
 
-    // Requisito 18 — Imposta deadline (solo admin)
+    // Requisito 18 — Imposta deadline
     @PatchMapping("/{id}/deadline")
     public ResponseEntity<Issue> setDeadline(
+            @PathVariable Long projectId,
             @PathVariable Long id,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal UserDetails userDetails) {
