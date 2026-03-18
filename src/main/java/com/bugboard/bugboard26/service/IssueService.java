@@ -53,6 +53,7 @@ public class IssueService {
     }
 
     // Requisito 9 — Modifica issue
+    // Requisito 9 — Modifica issue (aggiornato con auto-status)
     public Issue updateIssue(Long issueId, String title, String description,
                              Issue.Status status, String requesterEmail) {
         Issue issue = issueRepository.findById(issueId)
@@ -70,8 +71,33 @@ public class IssueService {
         if (title != null)       issue.setTitle(title);
         if (description != null) issue.setDescription(description);
         if (status != null)      issue.setStatus(status);
+
+        // ✅ Auto-status: se ha un assegnatario e non è DONE → IN_PROGRESS
+        if (issue.getAssignedTo() != null && issue.getStatus() != Issue.Status.DONE) {
+            issue.setStatus(Issue.Status.IN_PROGRESS);
+        }
+
         return issueRepository.save(issue);
     }
+
+    // ✅ NUOVO — Assegna issue a un utente
+    public Issue assignIssue(Long issueId, Long userId, String requesterEmail) {
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new RuntimeException("Issue non trovata"));
+        User requester = userRepository.findByEmail(requesterEmail)
+                .orElseThrow(() -> new RuntimeException("Utente non trovato"));
+
+        if (requester.getRole() != User.Role.ADMIN)
+            throw new RuntimeException("Solo gli admin possono assegnare issue");
+
+        User assignee = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utente non trovato"));
+
+        issue.setAssignedTo(assignee);
+        issue.setStatus(Issue.Status.IN_PROGRESS); // ← automatico
+        return issueRepository.save(issue);
+    }
+
 
     // Requisito 18 — Imposta deadline (solo admin)
     public Issue setDeadline(Long issueId, LocalDateTime deadline, String requesterEmail) {

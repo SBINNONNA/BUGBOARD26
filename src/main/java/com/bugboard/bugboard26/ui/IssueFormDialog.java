@@ -14,7 +14,7 @@ public class IssueFormDialog extends JDialog {
             new String[]{"BUG", "QUESTION", "FEATURE", "DOCUMENTATION"}
     );
     private final JComboBox<String> priorityBox = new JComboBox<>(
-            new String[]{"LOW", "MEDIUM", "HIGH"}
+            new String[]{"P1", "P2", "P3", "P4", "P5"}  // ← AGGIORNATO
     );
     private final JComboBox<String> statusBox = new JComboBox<>(
             new String[]{"TODO", "IN_PROGRESS", "DONE"}
@@ -22,7 +22,6 @@ public class IssueFormDialog extends JDialog {
     private final JTextArea commentsArea = new JTextArea(4, 25);
     private final JTextField commentField = new JTextField(20);
 
-    // ← prefisso base per tutti gli endpoint di questo progetto
     private String issueBase() {
         return "/projects/" + ApiClient.getCurrentProjectId() + "/issues";
     }
@@ -45,7 +44,7 @@ public class IssueFormDialog extends JDialog {
 
         addRow(panel, g, 0, "Titolo:", titleField);
         addRow(panel, g, 1, "Tipo:", typeBox);
-        addRow(panel, g, 2, "Priorità:", priorityBox);
+        addRow(panel, g, 2, "Priorità (1-5):", priorityBox);  // ← label aggiornata
         if (issueId != null) addRow(panel, g, 3, "Stato:", statusBox);
 
         g.gridx = 0; g.gridy = 4;
@@ -89,13 +88,12 @@ public class IssueFormDialog extends JDialog {
 
     private void loadIssue() {
         try {
-            // ✅ PRIMA: /issues/{id}  →  ORA: /projects/{projectId}/issues/{id}
             String resp = ApiClient.get(issueBase() + "/" + issueId);
             JsonNode n = ApiClient.mapper.readTree(resp);
             titleField.setText(n.get("title").asText());
             descArea.setText(n.path("description").asText());
             typeBox.setSelectedItem(n.get("type").asText());
-            priorityBox.setSelectedItem(n.get("priority").asText());
+            priorityBox.setSelectedItem(n.get("priority").asText()); // es. "P3"
             statusBox.setSelectedItem(n.get("status").asText());
             loadComments();
         } catch (Exception ex) {
@@ -105,7 +103,6 @@ public class IssueFormDialog extends JDialog {
 
     private void loadComments() {
         try {
-            // ✅ PRIMA: /issues/{id}/comments  →  ORA: /projects/{projectId}/issues/{id}/comments
             String resp = ApiClient.get(issueBase() + "/" + issueId + "/comments");
             JsonNode arr = ApiClient.mapper.readTree(resp);
             StringBuilder sb = new StringBuilder();
@@ -124,7 +121,6 @@ public class IssueFormDialog extends JDialog {
         if (text.isEmpty()) return;
         try {
             String json = String.format("{\"text\":\"%s\"}", text);
-            // ✅ PRIMA: /issues/{id}/comments  →  ORA: /projects/{projectId}/issues/{id}/comments
             ApiClient.postAuth(issueBase() + "/" + issueId + "/comments", json);
             commentField.setText("");
             loadComments();
@@ -146,7 +142,6 @@ public class IssueFormDialog extends JDialog {
                         "{\"title\":\"%s\",\"description\":\"%s\",\"type\":\"%s\",\"priority\":\"%s\"}",
                         title, desc, typeBox.getSelectedItem(), priorityBox.getSelectedItem()
                 );
-                // ✅ PRIMA: /issues  →  ORA: /projects/{projectId}/issues
                 ApiClient.postAuth(issueBase(), json);
                 JOptionPane.showMessageDialog(this, "Issue creata!");
             } else {
@@ -154,7 +149,6 @@ public class IssueFormDialog extends JDialog {
                         "{\"title\":\"%s\",\"description\":\"%s\",\"status\":\"%s\"}",
                         title, desc, statusBox.getSelectedItem()
                 );
-                // ✅ PRIMA: /issues/{id}  →  ORA: /projects/{projectId}/issues/{id}
                 ApiClient.put(issueBase() + "/" + issueId, json);
                 JOptionPane.showMessageDialog(this, "Issue aggiornata!");
             }

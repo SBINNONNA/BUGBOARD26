@@ -15,7 +15,7 @@ public class DashboardFrame extends JFrame {
     private JPanel todoPanel, inProgressPanel, donePanel;
     private final JTextField searchField = new JTextField(12);
     private final JComboBox<String> priFilter = new JComboBox<>(
-            new String[]{"Tutti", "LOW", "MEDIUM", "HIGH"});
+            new String[]{"Tutti", "P1", "P2", "P3", "P4", "P5"});
 
     final JLabel userLabel = new JLabel("...", SwingConstants.CENTER);
     final JLabel roleLabel = new JLabel("",   SwingConstants.CENTER);
@@ -33,7 +33,7 @@ public class DashboardFrame extends JFrame {
         add(buildSidebar(), BorderLayout.WEST);
         add(buildMain(),    BorderLayout.CENTER);
         fetchCurrentUser();
-        loadIssues();
+        SwingUtilities.invokeLater(this::loadIssues);
     }
 
     private void fetchCurrentUser() {
@@ -46,10 +46,6 @@ public class DashboardFrame extends JFrame {
                     JsonNode n = ApiClient.mapper.readTree(get());
                     currentUserId    = n.get("id").asLong();
                     currentUserEmail = n.get("email").asText();
-// ❌ PRIMA
-                    currentUserRole = n.path("role").asText("USER");
-
-// ✅ DOPO
                     String rawRole = "";
                     if (n.has("role"))             rawRole = n.get("role").asText("");
                     else if (n.has("roles"))       rawRole = n.get("roles").toString();
@@ -175,7 +171,10 @@ public class DashboardFrame extends JFrame {
         JButton aggiorna = topBtn("↻");
         cerca.addActionListener(e -> loadIssues());
         aggiorna.addActionListener(e -> loadIssues());
-        nuova.addActionListener(e -> { new IssueFormDialog(this, null).setVisible(true); loadIssues(); });
+        nuova.addActionListener(e -> {
+            new IssueFormDialog(this, null).setVisible(true);
+            loadIssues();
+        });
         filterRow.add(cerca); filterRow.add(nuova); filterRow.add(aggiorna);
 
         JPanel titleBlock = new JPanel(new BorderLayout());
@@ -233,7 +232,6 @@ public class DashboardFrame extends JFrame {
         hdr.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
         hdr.setOpaque(true);
         hdr.setBackground(COL_BG);
-
         JScrollPane scroll = new JScrollPane(content);
         scroll.setBorder(new RoundedBorder(18, new Color(130, 80, 200)));
         scroll.setColumnHeaderView(hdr);
@@ -251,7 +249,8 @@ public class DashboardFrame extends JFrame {
 
         new SwingWorker<String, Void>() {
             @Override protected String doInBackground() throws Exception {
-                StringBuilder url = new StringBuilder("/projects/" + ApiClient.getCurrentProjectId() + "/issues?");
+                StringBuilder url = new StringBuilder(
+                        "/projects/" + ApiClient.getCurrentProjectId() + "/issues?");
                 String kw = searchField.getText().trim();
                 if (!kw.isEmpty()) url.append("keyword=").append(kw).append("&");
                 String pr = (String) priFilter.getSelectedItem();
@@ -263,27 +262,47 @@ public class DashboardFrame extends JFrame {
                     JsonNode arr = ApiClient.mapper.readTree(get());
                     for (JsonNode issue : arr) {
                         JPanel card = buildCard(issue);
-                        switch (issue.get("status").asText()) {
-                            case "TODO"        -> { todoPanel.add(card);       todoPanel.add(Box.createVerticalStrut(8)); }
-                            case "IN_PROGRESS" -> { inProgressPanel.add(card); inProgressPanel.add(Box.createVerticalStrut(8)); }
-                            case "DONE"        -> { donePanel.add(card);       donePanel.add(Box.createVerticalStrut(8)); }
+
+                        String   status     = issue.get("status").asText();
+                        JsonNode assignedTo = issue.path("assignedTo");
+
+                        // ✅ LOGICA SMISTAMENTO:
+                        // DONE → RISOLTE
+                        // assignedTo presente → IN CORSO
+                        // nessun assegnatario → DA RISOLVERE
+                        boolean isAssigned = !assignedTo.isNull()
+                                && !assignedTo.isMissingNode()
+                                && assignedTo.has("id");
+
+                        if ("DONE".equals(status)) {
+                            donePanel.add(card);
+                            donePanel.add(Box.createVerticalStrut(8));
+                        } else if (isAssigned) {
+                            inProgressPanel.add(card);
+                            inProgressPanel.add(Box.createVerticalStrut(8));
+                        } else {
+                            todoPanel.add(card);
+                            todoPanel.add(Box.createVerticalStrut(8));
                         }
                     }
-                    todoPanel.revalidate(); inProgressPanel.revalidate(); donePanel.revalidate();
+                    todoPanel.revalidate();
+                    inProgressPanel.revalidate();
+                    donePanel.revalidate();
                     repaint();
                 } catch (Exception ex) {
-                    JOptionPane.showMessageDialog(DashboardFrame.this, "Errore: " + ex.getMessage());
+                    JOptionPane.showMessageDialog(DashboardFrame.this,
+                            "Errore caricamento issue: " + ex.getMessage());
                 }
             }
         }.execute();
     }
 
+    // ─── CARD ──────────────────────────────────────────────
     private JPanel buildCard(JsonNode issue) {
         Long   id       = issue.get("id").asLong();
         String title    = issue.get("title").asText();
         String type     = issue.get("type").asText();
         String priority = issue.get("priority").asText();
-        String creator  = issue.path("createdBy").path("email").asText();
 
         JPanel card = new JPanel(new BorderLayout(6, 4));
         card.setBackground(new Color(160, 112, 205));
@@ -311,22 +330,26 @@ public class DashboardFrame extends JFrame {
         // Bottom row: commenti + priorità
         JPanel botRow = new JPanel(new BorderLayout());
         botRow.setOpaque(false);
+
         int commentCount = 0;
         try {
             String resp = ApiClient.get("/projects/" + ApiClient.getCurrentProjectId()
                     + "/issues/" + id + "/comments");
-            JsonNode arr = ApiClient.mapper.readTree(resp);
-            commentCount = arr.size();
+            JsonNode comments = ApiClient.mapper.readTree(resp);
+            commentCount = comments.size();
         } catch (Exception ignored) {}
 
         JLabel commentIcon = new JLabel("💬 " + commentCount);
-        commentIcon.setForeground(new Color(220, 200, 255));
-        commentIcon.setFont(new Font("SansSerif", Font.PLAIN, 12));        commentIcon.setForeground(Color.WHITE);
-        JLabel priLbl = new JLabel(priority);
-        priLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+        commentIcon.setForeground(Color.WHITE);
+        commentIcon.setFont(new Font("SansSerif", Font.PLAIN, 12));
+
+        String priorityNum = priority.replace("P", "");
+        JLabel priLbl = new JLabel(priorityNum + "/5");
+        priLbl.setFont(new Font("SansSerif", Font.BOLD, 18));
         priLbl.setForeground(getPriorityColor(priority));
+
         botRow.add(commentIcon, BorderLayout.WEST);
-        botRow.add(priLbl,  BorderLayout.EAST);
+        botRow.add(priLbl,      BorderLayout.EAST);
 
         card.add(topRow,  BorderLayout.NORTH);
         card.add(typeLbl, BorderLayout.CENTER);
@@ -343,11 +366,12 @@ public class DashboardFrame extends JFrame {
         return card;
     }
 
-    private Color getPriorityColor(String p) {
-        return switch (p) {
-            case "HIGH"   -> new Color(255, 100, 100);
-            case "MEDIUM" -> new Color(255, 200, 50);
-            default       -> new Color(100, 255, 140);
+    private Color getPriorityColor(String priority) {
+        return switch (priority) {
+            case "P1", "P2" -> new Color(127, 0, 255);   // 🟢 verde
+            case "P3"       -> new Color(128, 0, 255);    // 🟡 giallo
+            case "P4", "P5" -> new Color(130, 0, 255);    // 🔴 rosso
+            default         -> Color.WHITE;
         };
     }
 }
