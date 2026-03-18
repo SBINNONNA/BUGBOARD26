@@ -311,12 +311,21 @@ public class DashboardFrame extends JFrame {
         // Bottom row: commenti + priorità
         JPanel botRow = new JPanel(new BorderLayout());
         botRow.setOpaque(false);
-        JLabel commLbl = new JLabel("💬");
-        commLbl.setForeground(Color.WHITE);
+        int commentCount = 0;
+        try {
+            String resp = ApiClient.get("/projects/" + ApiClient.getCurrentProjectId()
+                    + "/issues/" + id + "/comments");
+            JsonNode arr = ApiClient.mapper.readTree(resp);
+            commentCount = arr.size();
+        } catch (Exception ignored) {}
+
+        JLabel commentIcon = new JLabel("💬 " + commentCount);
+        commentIcon.setForeground(new Color(220, 200, 255));
+        commentIcon.setFont(new Font("SansSerif", Font.PLAIN, 12));        commentIcon.setForeground(Color.WHITE);
         JLabel priLbl = new JLabel(priority);
         priLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
         priLbl.setForeground(getPriorityColor(priority));
-        botRow.add(commLbl, BorderLayout.WEST);
+        botRow.add(commentIcon, BorderLayout.WEST);
         botRow.add(priLbl,  BorderLayout.EAST);
 
         card.add(topRow,  BorderLayout.NORTH);
