@@ -7,6 +7,8 @@ import java.awt.*;
 
 public class IssueFormDialog extends JDialog {
 
+
+
     private final Long issueId;
     private final JTextField titleField = new JTextField(25);
     private final JTextArea descArea = new JTextArea(4, 25);

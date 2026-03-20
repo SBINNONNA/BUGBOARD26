@@ -6,6 +6,8 @@ import java.awt.*;
 import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
 
+
+
 public class AvatarPanel extends JPanel {
 
     private BufferedImage avatarImage = null;

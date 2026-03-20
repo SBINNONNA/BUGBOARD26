@@ -13,6 +13,8 @@ public class NotificheDialog extends JDialog {
         getContentPane().setBackground(new Color(140, 80, 200));
         setLayout(new BorderLayout());
 
+
+
         JLabel title = new JLabel("  🔔 Notifiche", SwingConstants.LEFT);
         title.setFont(new Font("SansSerif", Font.BOLD, 16));
         title.setForeground(Color.WHITE);
