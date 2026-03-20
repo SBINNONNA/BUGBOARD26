@@ -84,10 +84,7 @@ public class IssueService {
         if (description != null) issue.setDescription(description);
         if (status != null)      issue.setStatus(status);
 
-        // ✅ Auto-status: se ha un assegnatario e non è DONE → IN_PROGRESS
-        if (issue.getAssignedTo() != null && issue.getStatus() != Issue.Status.DONE) {
-            issue.setStatus(Issue.Status.IN_PROGRESS);
-        }
+
 
         return issueRepository.save(issue);
     }
@@ -107,6 +104,11 @@ public class IssueService {
 
         issue.setAssignedTo(assignee);
         issue.setStatus(Issue.Status.IN_PROGRESS); // ← automatico
+        // ← AGGIUNGI: aggiunge l'utente ai membri del progetto se non c'è già
+        if (!issue.getProject().getMembers().contains(assignee)) {
+            issue.getProject().getMembers().add(assignee);
+            projectRepository.save(issue.getProject()); // ← AGGIUNGI
+        }
         return issueRepository.save(issue);
     }
 

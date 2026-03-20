@@ -74,18 +74,34 @@ public class ApiClient {
                 .header("Authorization", "Bearer " + token)
                 .PUT(HttpRequest.BodyPublishers.ofString(json))
                 .build();
-        return client.send(request, HttpResponse.BodyHandlers.ofString()).body();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400)                          // ← aggiunge questo
+            throw new RuntimeException("HTTP " + response.statusCode() + ": " + response.body());
+        return response.body();
     }
+
     public static String patch(String path, String json) throws Exception {
-        // stessa struttura di put() ma con metodo PATCH
-        java.net.URL url = new java.net.URL(BASE_URL + path);
-        java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("PATCH");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Authorization", "Bearer " + token);
-        conn.setDoOutput(true);
-        conn.getOutputStream().write(json.getBytes());
-        return new String(conn.getInputStream().readAllBytes());
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + path))
+                .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + token)
+                .method("PATCH", HttpRequest.BodyPublishers.ofString(json))
+                .build();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400)
+            throw new RuntimeException("HTTP " + response.statusCode() + ": " + response.body());
+        return response.body();
     }
+    public static void delete(String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(BASE_URL + path))
+                .header("Authorization", "Bearer " + token)
+                .DELETE()
+                .build();
+        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() >= 400)
+            throw new RuntimeException("HTTP " + response.statusCode() + ": " + response.body());
+    }
+
 
 }

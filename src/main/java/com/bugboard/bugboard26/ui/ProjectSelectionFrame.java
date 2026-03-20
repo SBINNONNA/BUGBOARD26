@@ -43,7 +43,8 @@ public class ProjectSelectionFrame extends JFrame {
         allUsersBtn = new JButton("👥 Tutti gli Utenti");
         styleTopBtn(allUsersBtn);
         allUsersBtn.setVisible(false);
-        allUsersBtn.addActionListener(e -> new UtentiDialog(this).setVisible(true));
+// DOPO
+        allUsersBtn.addActionListener(e -> new UtentiDialog(this, "ADMIN".equals(currentRole)).setVisible(true));
 
 
         add(buildTopBar(),  BorderLayout.NORTH);

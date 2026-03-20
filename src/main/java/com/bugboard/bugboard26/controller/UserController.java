@@ -7,6 +7,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import com.bugboard.bugboard26.model.Issue;
+import com.bugboard.bugboard26.repository.IssueRepository;
+import com.bugboard.bugboard26.model.Comment;
+import com.bugboard.bugboard26.repository.CommentRepository;
+import com.bugboard.bugboard26.model.Project;
+import com.bugboard.bugboard26.repository.ProjectRepository;
 
 import java.security.Principal;
 import java.util.List;
@@ -19,10 +25,27 @@ public class UserController {
     private final UserRepository  userRepo;
     private final PasswordEncoder passwordEncoder;
 
-    public UserController(UserRepository userRepo, PasswordEncoder passwordEncoder) {
+    // Campo da aggiungere
+    private final IssueRepository issueRepo;
+
+    private final CommentRepository commentRepo;
+
+    private final ProjectRepository projectRepo;
+
+    public UserController(UserRepository userRepo,
+                          PasswordEncoder passwordEncoder,
+                          IssueRepository issueRepo,
+                          CommentRepository commentRepo,
+                          ProjectRepository projectRepo) {
         this.userRepo        = userRepo;
         this.passwordEncoder = passwordEncoder;
+        this.issueRepo       = issueRepo;
+        this.commentRepo     = commentRepo;
+        this.projectRepo     = projectRepo;
     }
+
+
+
 
     @GetMapping("/me")
     public ResponseEntity<?> getMe(Principal principal) {
@@ -79,7 +102,41 @@ public class UserController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
+        User user = userRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Utente non trovato"));
+
+        // 1. Cancella tutti i commenti scritti dall'utente
+        commentRepo.deleteAll(commentRepo.findByAuthor(user));
+
+        // 2. Azzera i riferimenti nelle issue
+        for (Issue issue : issueRepo.findAll()) {
+            boolean changed = false;
+            if (user.equals(issue.getAssignedTo())) {
+                issue.setAssignedTo(null);
+                issue.setStatus(Issue.Status.TODO);
+                changed = true;
+            }
+            if (user.equals(issue.getCreatedBy())) {
+                issue.setCreatedBy(null);
+                changed = true;
+            }
+            if (changed) issueRepo.save(issue);
+        }
+        // 3. Rimuovi l'utente da tutti i progetti in cui è membro
+        for (Project project : projectRepo.findAll()) {
+            if (project.getMembers().remove(user)) {
+                projectRepo.save(project);
+            }
+        }
+
+// 4. Cancella l'utente
+        userRepo.deleteById(id);
+
+
+        // 3. Cancella l'utente
         userRepo.deleteById(id);
         return ResponseEntity.noContent().build();
     }
+
+
 }
