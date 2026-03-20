@@ -23,19 +23,37 @@ public class ProjectController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Project> create(@RequestBody Map<String, String> body) {
-        Project p = projectService.create(
+        return ResponseEntity.ok(projectService.create(
                 body.get("name"),
                 body.getOrDefault("description", "")
-        );
-        return ResponseEntity.ok(p);
+        ));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         projectService.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/members")
+    public ResponseEntity<?> getMembers(@PathVariable Long id) {
+        return projectService.getProjectMembers(id);
+    }
+
+    @PostMapping("/{id}/members/{userId}")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> addMember(@PathVariable Long id,
+                                       @PathVariable Long userId) {
+        return projectService.addMember(id, userId);
+    }
+
+    @DeleteMapping("/{id}/members/{userId}")
+    @PreAuthorize("hasAuthority('ADMIN')")
+    public ResponseEntity<?> removeMember(@PathVariable Long id,
+                                          @PathVariable Long userId) {
+        return projectService.removeMember(id, userId);
     }
 }

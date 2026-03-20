@@ -50,9 +50,9 @@ public class MembriDialog extends JDialog {
         table.setRowHeight(28);
         table.setGridColor(new Color(130, 80, 190));
 
-        // Carica utenti
         try {
-            String resp = ApiClient.get("/users");
+            Long projectId = ApiClient.getCurrentProjectId();
+            String resp = ApiClient.get("/projects/" + projectId + "/members");
             JsonNode arr = ApiClient.mapper.readTree(resp);
             for (JsonNode u : arr) {
                 model.addRow(new Object[]{
@@ -64,6 +64,7 @@ public class MembriDialog extends JDialog {
         } catch (Exception ex) {
             model.addRow(new Object[]{"Err", ex.getMessage(), ""});
         }
+
 
         JScrollPane scroll = new JScrollPane(table);
         scroll.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));

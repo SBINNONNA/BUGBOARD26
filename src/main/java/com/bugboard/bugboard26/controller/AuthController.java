@@ -27,14 +27,15 @@ public class AuthController {
 
     // Crea account — solo ADMIN (requisito 1)
     @PostMapping("/register")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ADMIN')")  // ← era hasRole, ora hasAuthority
     public ResponseEntity<?> register(@RequestBody Map<String, String> body) {
         User.Role role = User.Role.valueOf(body.get("role").toUpperCase());
         User user = authService.register(body.get("email"), body.get("password"), role);
         return ResponseEntity.ok(Map.of(
-                "id", user.getId(),
+                "id",    user.getId(),
                 "email", user.getEmail(),
-                "role", user.getRole()
+                "role",  user.getRole()
         ));
     }
+
 }

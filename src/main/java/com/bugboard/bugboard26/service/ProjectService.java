@@ -4,10 +4,13 @@ import com.bugboard.bugboard26.model.Project;
 import com.bugboard.bugboard26.model.User;
 import com.bugboard.bugboard26.repository.ProjectRepository;
 import com.bugboard.bugboard26.repository.UserRepository;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class ProjectService {
@@ -36,5 +39,49 @@ public class ProjectService {
 
     public void delete(Long id) {
         projectRepo.deleteById(id);
+    }
+
+    /** Restituisce ADMIN globali + utenti assegnati al progetto, senza duplicati */
+    public ResponseEntity<?> getProjectMembers(Long projectId) {
+        Project project = projectRepo.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Progetto non trovato"));
+
+        List<User> admins = userRepo.findAll().stream()
+                .filter(u -> u.getRole() == User.Role.ADMIN)
+                .collect(Collectors.toList());
+
+        List<User> result = Stream.concat(admins.stream(), project.getMembers().stream())
+                .distinct()
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(result);
+    }
+
+    /** Aggiunge un utente come membro del progetto */
+    public ResponseEntity<?> addMember(Long projectId, Long userId) {
+        Project project = projectRepo.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Progetto non trovato"));
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utente non trovato"));
+
+        if (!project.getMembers().contains(user)) {
+            project.getMembers().add(user);
+            // Aggiorna il ruolo a ASSIGNED_USER se era UNASSIGNED
+            if (user.getRole() == User.Role.UNASSIGNED_USER) {
+                user.setRole(User.Role.ASSIGNED_USER);
+                userRepo.save(user);
+            }
+            projectRepo.save(project);
+        }
+        return ResponseEntity.ok("Membro aggiunto");
+    }
+
+    /** Rimuove un utente dal progetto */
+    public ResponseEntity<?> removeMember(Long projectId, Long userId) {
+        Project project = projectRepo.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Progetto non trovato"));
+        project.getMembers().removeIf(u -> u.getId().equals(userId));
+        projectRepo.save(project);
+        return ResponseEntity.ok("Membro rimosso");
     }
 }

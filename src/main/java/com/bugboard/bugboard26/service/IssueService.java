@@ -29,21 +29,33 @@ public class IssueService {
     // Requisito 2 — Crea issue nel progetto corretto
     public Issue createIssue(Long projectId, String title, String description,
                              Issue.IssueType type, Issue.Priority priority,
-                             String creatorEmail) {
+                             String creatorEmail, Long assignedToId) {   // ← aggiunto assignedToId
         User creator = userRepository.findByEmail(creatorEmail)
                 .orElseThrow(() -> new RuntimeException("Utente non trovato"));
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Progetto non trovato"));
+
         Issue issue = new Issue();
-        issue.setProject(project);   // ← collega al progetto
+        issue.setProject(project);
         issue.setTitle(title);
         issue.setDescription(description);
         issue.setType(type);
         issue.setPriority(priority);
         issue.setStatus(Issue.Status.TODO);
         issue.setCreatedBy(creator);
+
+        // Solo l'admin può assegnare al momento della creazione
+        if (assignedToId != null && creator.getRole() == User.Role.ADMIN) {
+            User assignee = userRepository.findById(assignedToId)
+                    .orElseThrow(() -> new RuntimeException("Assegnatario non trovato"));
+            issue.setAssignedTo(assignee);
+            issue.setStatus(Issue.Status.IN_PROGRESS);
+        }
+
         return issueRepository.save(issue);
     }
+
+
 
     // Requisito 3 — Filtra issue per progetto
     public List<Issue> getIssues(Long projectId, String keyword,

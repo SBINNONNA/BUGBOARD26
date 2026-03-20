@@ -4,6 +4,7 @@ import com.bugboard.bugboard26.model.User;
 import com.bugboard.bugboard26.repository.UserRepository;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,22 +31,23 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
-
     @GetMapping
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<User>> getAll() {
         return ResponseEntity.ok(userRepo.findAll());
     }
 
     @PostMapping
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody Map<String, String> body) {
         if (userRepo.findByEmail(body.get("email")).isPresent())
             return ResponseEntity.badRequest().body("Email già in uso");
 
-        User.Role role = User.Role.UNASSIGNED_USER; // default
+        User.Role role = User.Role.UNASSIGNED_USER;
         if (body.containsKey("role")) {
             try {
                 role = User.Role.valueOf(body.get("role").toUpperCase());
-                if (role == User.Role.ASSIGNED_USER)  // ← bloccato: lo assegna il progetto
+                if (role == User.Role.ASSIGNED_USER)
                     return ResponseEntity.badRequest().body("Ruolo non valido per la creazione");
             } catch (IllegalArgumentException e) {
                 return ResponseEntity.badRequest().body("Ruolo non riconosciuto");
@@ -57,11 +59,13 @@ public class UserController {
         u.setPassword(passwordEncoder.encode(body.get("password")));
         u.setRole(role);
 
-        return ResponseEntity.status(HttpStatus.CREATED).body(userRepo.save(u));
-    }
-
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED).body(userRepo.save(u));
+        } catch (jakarta.validation.ConstraintViolationException e) {
+            return ResponseEntity.badRequest().body("Email non valida o dati mancanti");    }}
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> update(@PathVariable Long id,
                                     @RequestBody Map<String, String> body) {
         User user = userRepo.findById(id)
@@ -73,6 +77,7 @@ public class UserController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         userRepo.deleteById(id);
         return ResponseEntity.noContent().build();

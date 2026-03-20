@@ -11,9 +11,8 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
-
 @RestController
-@RequestMapping("/api/projects/{projectId}/issues")  // ← endpoint annidato nel progetto
+@RequestMapping("/api/projects/{projectId}/issues")
 public class IssueController {
 
     private final IssueService issueService;
@@ -22,19 +21,25 @@ public class IssueController {
         this.issueService = issueService;
     }
 
-    // Requisito 2 — Crea issue
+    // Requisito 2 — Crea issue (con assegnazione opzionale per admin)
     @PostMapping
     public ResponseEntity<Issue> createIssue(
             @PathVariable Long projectId,
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal UserDetails userDetails) {
+
+        Long assignedToId = null;
+        String a = body.get("assignedToId");
+        if (a != null && !a.isEmpty()) assignedToId = Long.parseLong(a);
+
         Issue issue = issueService.createIssue(
                 projectId,
                 body.get("title"),
                 body.get("description"),
                 Issue.IssueType.valueOf(body.get("type").toUpperCase()),
                 Issue.Priority.valueOf(body.get("priority").toUpperCase()),
-                userDetails.getUsername()
+                userDetails.getUsername(),
+                assignedToId          // ← nuovo parametro
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(issue);
     }
@@ -47,20 +52,19 @@ public class IssueController {
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String priority) {
-        Issue.IssueType   issueType     = type     != null ? Issue.IssueType.valueOf(type.toUpperCase())     : null;
-        Issue.Status      issueStatus   = status   != null ? Issue.Status.valueOf(status.toUpperCase())      : null;
-        Issue.Priority    issuePriority = priority != null ? Issue.Priority.valueOf(priority.toUpperCase())  : null;
+        Issue.IssueType  issueType     = type     != null ? Issue.IssueType.valueOf(type.toUpperCase())    : null;
+        Issue.Status     issueStatus   = status   != null ? Issue.Status.valueOf(status.toUpperCase())     : null;
+        Issue.Priority   issuePriority = priority != null ? Issue.Priority.valueOf(priority.toUpperCase()) : null;
         return ResponseEntity.ok(issueService.getIssues(projectId, keyword, issueType, issueStatus, issuePriority));
     }
 
     // Singola issue per ID
     @GetMapping("/{id}")
-    public ResponseEntity<Issue> getIssue(@PathVariable Long projectId,
-                                          @PathVariable Long id) {
+    public ResponseEntity<Issue> getIssue(@PathVariable Long projectId, @PathVariable Long id) {
         return ResponseEntity.ok(issueService.getIssueById(id));
     }
 
-    // Requisito 9 — Modifica issue
+    // Requisito 9 — Modifica issue (titolo, descrizione, stato)
     @PutMapping("/{id}")
     public ResponseEntity<Issue> updateIssue(
             @PathVariable Long projectId,
@@ -71,8 +75,19 @@ public class IssueController {
                 Issue.Status.valueOf(body.get("status").toUpperCase()) : null;
         Issue updated = issueService.updateIssue(
                 id, body.get("title"), body.get("description"),
-                status, userDetails.getUsername()
-        );
+                status, userDetails.getUsername());
+        return ResponseEntity.ok(updated);
+    }
+
+    // ✅ NUOVO — Assegna issue a un utente (solo admin)
+    @PatchMapping("/{id}/assign")
+    public ResponseEntity<Issue> assignIssue(
+            @PathVariable Long projectId,
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long userId = Long.parseLong(body.get("userId"));
+        Issue updated = issueService.assignIssue(id, userId, userDetails.getUsername());
         return ResponseEntity.ok(updated);
     }
 

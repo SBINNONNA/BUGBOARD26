@@ -18,6 +18,9 @@ public class ProjectSelectionFrame extends JFrame {
 
     private final JButton newBtn;
     private final JButton newUserBtn;
+    // ── AGGIUNGI campo (vicino a newBtn e newUserBtn) ──
+    private final JButton allUsersBtn;
+
 
     public ProjectSelectionFrame() {
         setTitle("BugBoard26 — Scegli progetto");
@@ -36,6 +39,12 @@ public class ProjectSelectionFrame extends JFrame {
         styleTopBtn(newUserBtn);
         newUserBtn.setVisible(false);
         newUserBtn.addActionListener(e -> showCreateUserDialog());
+
+        allUsersBtn = new JButton("👥 Tutti gli Utenti");
+        styleTopBtn(allUsersBtn);
+        allUsersBtn.setVisible(false);
+        allUsersBtn.addActionListener(e -> new UtentiDialog(this).setVisible(true));
+
 
         add(buildTopBar(),  BorderLayout.NORTH);
         add(buildContent(), BorderLayout.CENTER);
@@ -90,6 +99,7 @@ public class ProjectSelectionFrame extends JFrame {
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setOpaque(false);
+        btnPanel.add(allUsersBtn);   // ← AGGIUNGI prima degli altri
         btnPanel.add(newUserBtn);
         btnPanel.add(newBtn);
 
@@ -132,6 +142,8 @@ public class ProjectSelectionFrame extends JFrame {
                     if ("ADMIN".equals(currentRole)) {
                         newBtn.setVisible(true);
                         newUserBtn.setVisible(true);
+                        allUsersBtn.setVisible(true);  // ← AGGIUNGI questa riga
+
                     }
 
                     JsonNode arr = ApiClient.mapper.readTree(results[1]);
