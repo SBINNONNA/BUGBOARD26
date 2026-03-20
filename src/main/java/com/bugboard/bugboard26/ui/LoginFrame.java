@@ -25,7 +25,7 @@ public class LoginFrame extends JFrame {
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(420, 520);
         setLocationRelativeTo(null);
-        setResizable(false);
+        setResizable(true);
         getContentPane().setBackground(BG);
 
         setLayout(new GridBagLayout());

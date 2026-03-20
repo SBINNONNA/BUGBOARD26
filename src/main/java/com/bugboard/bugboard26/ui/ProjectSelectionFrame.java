@@ -8,17 +8,16 @@ import java.awt.event.*;
 
 public class ProjectSelectionFrame extends JFrame {
 
-    private static final Color BG         = new Color(155, 100, 215);
-    private static final Color SIDEBAR_BG = new Color(100, 0, 170);
-    private static final Color CARD_BG    = new Color(140, 80, 200);
-    private static final Color CARD_HOV   = new Color(160, 105, 225);
-    private static final Color PURPLE     = new Color(85, 0, 155);
+    private static final Color BG       = new Color(155, 100, 215);
+    private static final Color CARD_BG  = new Color(140, 80, 200);
+    private static final Color CARD_HOV = new Color(160, 105, 225);
+    private static final Color PURPLE   = new Color(85, 0, 155);
 
-    private JPanel  cardsPanel;
-    private String  currentRole = "USER";
+    private JPanel cardsPanel;
+    private String currentRole = "USER";
 
-    // ← campo diretto, non più cercato ricorsivamente
     private final JButton newBtn;
+    private final JButton newUserBtn;
 
     public ProjectSelectionFrame() {
         setTitle("BugBoard26 — Scegli progetto");
@@ -28,20 +27,18 @@ public class ProjectSelectionFrame extends JFrame {
         setLayout(new BorderLayout());
         getContentPane().setBackground(BG);
 
-        // Inizializza newBtn PRIMA di buildContent()
         newBtn = new JButton("＋ Nuovo Progetto");
-        newBtn.setBackground(PURPLE);
-        newBtn.setForeground(Color.WHITE);
-        newBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
-        newBtn.setFocusPainted(false);
-        newBtn.setBorderPainted(false);
-        newBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        newBtn.setVisible(false); // nascosto finché non sappiamo il ruolo
+        styleTopBtn(newBtn);
+        newBtn.setVisible(false);
         newBtn.addActionListener(e -> showCreateDialog());
+
+        newUserBtn = new JButton("＋ Nuovo Utente");
+        styleTopBtn(newUserBtn);
+        newUserBtn.setVisible(false);
+        newUserBtn.addActionListener(e -> showCreateUserDialog());
 
         add(buildTopBar(),  BorderLayout.NORTH);
         add(buildContent(), BorderLayout.CENTER);
-
         fetchRoleAndProjects();
     }
 
@@ -83,7 +80,6 @@ public class ProjectSelectionFrame extends JFrame {
         outer.setBackground(BG);
         outer.setBorder(BorderFactory.createEmptyBorder(30, 40, 30, 40));
 
-        // Header row con titolo e bottone nuovo progetto
         JPanel headerRow = new JPanel(new BorderLayout());
         headerRow.setOpaque(false);
         headerRow.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
@@ -92,10 +88,14 @@ public class ProjectSelectionFrame extends JFrame {
         heading.setFont(new Font("SansSerif", Font.BOLD, 26));
         heading.setForeground(new Color(50, 0, 90));
 
-        headerRow.add(heading, BorderLayout.WEST);
-        headerRow.add(newBtn,  BorderLayout.EAST); // newBtn già inizializzato nel costruttore
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        btnPanel.setOpaque(false);
+        btnPanel.add(newUserBtn);
+        btnPanel.add(newBtn);
 
-        // Area card con WrapLayout
+        headerRow.add(heading,  BorderLayout.WEST);
+        headerRow.add(btnPanel, BorderLayout.EAST);
+
         cardsPanel = new JPanel(new WrapLayout(FlowLayout.LEFT, 18, 18));
         cardsPanel.setBackground(BG);
 
@@ -113,44 +113,29 @@ public class ProjectSelectionFrame extends JFrame {
     // ─── CARICAMENTO ─────────────────────────────────────────
     private void fetchRoleAndProjects() {
         new SwingWorker<String[], Void>() {
-            @Override
-            protected String[] doInBackground() throws Exception {
+            @Override protected String[] doInBackground() throws Exception {
                 String me       = ApiClient.get("/users/me");
                 String projects = ApiClient.get("/projects");
                 return new String[]{me, projects};
             }
-
-            @Override
-            protected void done() {
+            @Override protected void done() {
                 try {
-
                     String[] results = get();
                     JsonNode me = ApiClient.mapper.readTree(results[0]);
-                    currentRole = me.path("role").asText("USER");
 
-                    // ← Ora funziona perché newBtn è un campo diretto
-                    // ✅ DOPO — gestisce ADMIN, ROLE_ADMIN, admin, ecc.
                     String rawRole = "";
-
-// Prova il campo "role"
-                    if (me.has("role"))        rawRole = me.get("role").asText("");
-// Prova il campo "roles" (array)
-                    else if (me.has("roles"))  rawRole = me.get("roles").toString();
-// Prova il campo "authorities" (Spring Security)
+                    if (me.has("role"))             rawRole = me.get("role").asText("");
+                    else if (me.has("roles"))       rawRole = me.get("roles").toString();
                     else if (me.has("authorities")) rawRole = me.get("authorities").toString();
-
                     currentRole = rawRole.toUpperCase().contains("ADMIN") ? "ADMIN" : "USER";
-
-                    System.out.println(">>> ROLE RILEVATO: " + currentRole + " (raw: " + rawRole + ")");
 
                     if ("ADMIN".equals(currentRole)) {
                         newBtn.setVisible(true);
+                        newUserBtn.setVisible(true);
                     }
-
 
                     JsonNode arr = ApiClient.mapper.readTree(results[1]);
                     cardsPanel.removeAll();
-
                     if (arr.isEmpty()) {
                         JLabel empty = new JLabel("Nessun progetto disponibile.");
                         empty.setForeground(new Color(230, 210, 255));
@@ -159,7 +144,6 @@ public class ProjectSelectionFrame extends JFrame {
                     } else {
                         for (JsonNode p : arr) addProjectCard(p);
                     }
-
                     cardsPanel.revalidate();
                     cardsPanel.repaint();
                 } catch (Exception ex) {
@@ -227,17 +211,79 @@ public class ProjectSelectionFrame extends JFrame {
             public void mouseEntered(MouseEvent e) { card.setBackground(CARD_HOV); }
             public void mouseExited(MouseEvent e)  { card.setBackground(CARD_BG);  }
         });
-
         cardsPanel.add(card);
     }
 
-    // ─── AZIONI ───────────────────────────────────────────────
-    private void openProject(Long id, String name) {
-        ApiClient.setCurrentProject(id, name);
-        dispose();
-        new DashboardFrame().setVisible(true);
+    // ─── DIALOG NUOVO UTENTE ──────────────────────────────────
+    private void showCreateUserDialog() {
+        JDialog dlg = new JDialog(this, "Nuovo Utente", true);
+        dlg.setSize(400, 280);
+        dlg.setLocationRelativeTo(this);
+        dlg.getContentPane().setBackground(new Color(120, 60, 190));
+        dlg.setLayout(new GridBagLayout());
+
+        GridBagConstraints g = new GridBagConstraints();
+        g.insets = new Insets(8, 12, 8, 12);
+        g.fill = GridBagConstraints.HORIZONTAL;
+
+        JTextField    emailField = new JTextField(20);
+        JPasswordField passField = new JPasswordField(20);
+        JComboBox<String> roleBox = new JComboBox<>(
+                new String[]{"UNASSIGNED_USER", "ADMIN"}  // ← aggiornati
+        );
+
+        styleField(emailField);
+        styleField(passField);
+        roleBox.setBackground(new Color(160, 110, 215));
+        roleBox.setForeground(Color.BLACK);
+        roleBox.setFont(new Font("SansSerif", Font.PLAIN, 13));
+
+        String[]     labels = {"Email:", "Password:", "Ruolo:"};
+        JComponent[] fields = {emailField, passField, roleBox};
+
+        for (int i = 0; i < labels.length; i++) {
+            g.gridx = 0; g.gridy = i; g.gridwidth = 1;
+            JLabel lbl = new JLabel(labels[i]);
+            lbl.setForeground(new Color(220, 195, 255));
+            lbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+            dlg.add(lbl, g);
+            g.gridx = 1;
+            dlg.add(fields[i], g);
+        }
+
+        JButton save = new JButton("✔ Crea Utente");
+        save.setBackground(PURPLE);
+        save.setForeground(Color.WHITE);
+        save.setFocusPainted(false);
+        save.setBorderPainted(false);
+        save.setFont(new Font("SansSerif", Font.BOLD, 13));
+        g.gridx = 0; g.gridy = 3; g.gridwidth = 2;
+        dlg.add(save, g);
+
+        save.addActionListener(e -> {
+            String email = emailField.getText().trim();
+            String pass  = new String(passField.getPassword()).trim();
+            String role  = (String) roleBox.getSelectedItem();
+            if (email.isEmpty() || pass.isEmpty()) {
+                JOptionPane.showMessageDialog(dlg, "Email e password sono obbligatorie");
+                return;
+            }
+            try {
+                String json = String.format(
+                        "{\"email\":\"%s\",\"password\":\"%s\",\"role\":\"%s\"}",
+                        email, pass, role);
+                ApiClient.postAuth("/users", json);
+                JOptionPane.showMessageDialog(dlg, "Utente creato con successo! ✅");
+                dlg.dispose();
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dlg, "Errore: " + ex.getMessage());
+            }
+        });
+
+        dlg.setVisible(true);
     }
 
+    // ─── DIALOG NUOVO PROGETTO ────────────────────────────────
     private void showCreateDialog() {
         JDialog dlg = new JDialog(this, "Nuovo Progetto", true);
         dlg.setSize(380, 260);
@@ -257,21 +303,19 @@ public class ProjectSelectionFrame extends JFrame {
         descArea.setFont(new Font("SansSerif", Font.PLAIN, 13));
         descArea.setBorder(BorderFactory.createLineBorder(new Color(190, 150, 240)));
 
-        g.gridx = 0; g.gridy = 0; g.gridwidth = 1;
+        g.gridx = 0; g.gridy = 0;
         JLabel nl = new JLabel("Nome:");
         nl.setForeground(new Color(220, 195, 255));
         nl.setFont(new Font("SansSerif", Font.BOLD, 12));
         dlg.add(nl, g);
-        g.gridx = 1;
-        dlg.add(nameField, g);
+        g.gridx = 1; dlg.add(nameField, g);
 
         g.gridx = 0; g.gridy = 1;
         JLabel dl = new JLabel("Descrizione:");
         dl.setForeground(new Color(220, 195, 255));
         dl.setFont(new Font("SansSerif", Font.BOLD, 12));
         dlg.add(dl, g);
-        g.gridx = 1;
-        dlg.add(new JScrollPane(descArea), g);
+        g.gridx = 1; dlg.add(new JScrollPane(descArea), g);
 
         JButton save = new JButton("✔ Crea Progetto");
         save.setBackground(PURPLE);
@@ -294,13 +338,20 @@ public class ProjectSelectionFrame extends JFrame {
                         "{\"name\":\"%s\",\"description\":\"%s\"}", n, d);
                 ApiClient.postAuth("/projects", json);
                 dlg.dispose();
-                fetchRoleAndProjects(); // ricarica la lista
+                fetchRoleAndProjects();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(dlg, "Errore: " + ex.getMessage());
             }
         });
 
         dlg.setVisible(true);
+    }
+
+    // ─── AZIONI ───────────────────────────────────────────────
+    private void openProject(Long id, String name) {
+        ApiClient.setCurrentProject(id, name);
+        dispose();
+        new DashboardFrame().setVisible(true);
     }
 
     private void deleteProject(Long id) {
@@ -318,7 +369,27 @@ public class ProjectSelectionFrame extends JFrame {
         }.execute();
     }
 
+    // ─── UTILITY ──────────────────────────────────────────────
+    private void styleTopBtn(JButton btn) {
+        btn.setBackground(PURPLE);
+        btn.setForeground(Color.WHITE);
+        btn.setFont(new Font("SansSerif", Font.BOLD, 13));
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+    }
+
     private void styleField(JTextField f) {
+        f.setBackground(new Color(160, 110, 215));
+        f.setForeground(Color.WHITE);
+        f.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        f.setBorder(BorderFactory.createCompoundBorder(
+                new LineBorder(new Color(190, 150, 240), 1, true),
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)
+        ));
+    }
+
+    private void styleField(JPasswordField f) {
         f.setBackground(new Color(160, 110, 215));
         f.setForeground(Color.WHITE);
         f.setFont(new Font("SansSerif", Font.PLAIN, 13));
