@@ -1,5 +1,8 @@
 package com.bugboard.bugboard26.controller;
 
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
+
 import com.bugboard.bugboard26.model.User;
 import com.bugboard.bugboard26.repository.UserRepository;
 import org.springframework.http.HttpStatus;
@@ -22,14 +25,10 @@ import java.util.Map;
 @RequestMapping("/api/users")
 public class UserController {
 
-    private final UserRepository  userRepo;
-    private final PasswordEncoder passwordEncoder;
-
-    // Campo da aggiungere
-    private final IssueRepository issueRepo;
-
+    private final UserRepository    userRepo;
+    private final PasswordEncoder   passwordEncoder;
+    private final IssueRepository   issueRepo;
     private final CommentRepository commentRepo;
-
     private final ProjectRepository projectRepo;
 
     public UserController(UserRepository userRepo,
@@ -43,9 +42,6 @@ public class UserController {
         this.commentRepo     = commentRepo;
         this.projectRepo     = projectRepo;
     }
-
-
-
 
     @GetMapping("/me")
     public ResponseEntity<?> getMe(Principal principal) {
@@ -85,7 +81,9 @@ public class UserController {
         try {
             return ResponseEntity.status(HttpStatus.CREATED).body(userRepo.save(u));
         } catch (jakarta.validation.ConstraintViolationException e) {
-            return ResponseEntity.badRequest().body("Email non valida o dati mancanti");    }}
+            return ResponseEntity.badRequest().body("Email non valida o dati mancanti");
+        }
+    }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
@@ -122,6 +120,7 @@ public class UserController {
             }
             if (changed) issueRepo.save(issue);
         }
+
         // 3. Rimuovi l'utente da tutti i progetti in cui è membro
         for (Project project : projectRepo.findAll()) {
             if (project.getMembers().remove(user)) {
@@ -129,14 +128,19 @@ public class UserController {
             }
         }
 
-// 4. Cancella l'utente
-        userRepo.deleteById(id);
-
-
-        // 3. Cancella l'utente
+        // 4. Cancella l'utente
         userRepo.deleteById(id);
         return ResponseEntity.noContent().build();
     }
 
-
+    // ── Aggiorna foto profilo ──────────────────────────────
+    @PutMapping("/me/picture")   // ← era "/users/me/picture", corretto in "/me/picture"
+    public ResponseEntity<User> updatePicture(
+            @RequestBody Map<String, String> body,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = userRepo.findByEmail(userDetails.getUsername())  // ← era userRepository
+                .orElseThrow(() -> new RuntimeException("Utente non trovato"));
+        user.setProfilePicture(body.get("profilePicture"));
+        return ResponseEntity.ok(userRepo.save(user));               // ← era userRepository
+    }
 }

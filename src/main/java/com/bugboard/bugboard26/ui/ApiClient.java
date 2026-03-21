@@ -42,6 +42,46 @@ public class ApiClient {
                 .build();
         return client.send(request, HttpResponse.BodyHandlers.ofString()).body();
     }
+    public static String uploadFile(java.io.File file) throws Exception {
+        String boundary  = "----Boundary" + System.currentTimeMillis();
+        byte[] fileBytes = java.nio.file.Files.readAllBytes(file.toPath());
+
+        // ← rileva il MIME correttamente per jpg, jpeg, png, gif
+        String name = file.getName().toLowerCase();
+        String mime;
+        if      (name.endsWith(".png"))  mime = "image/png";
+        else if (name.endsWith(".gif"))  mime = "image/gif";
+        else                             mime = "image/jpeg";
+
+        byte[] header = ("--" + boundary + "\r\n"
+                + "Content-Disposition: form-data; name=\"file\"; filename=\""
+                + file.getName() + "\"\r\n"
+                + "Content-Type: " + mime + "\r\n\r\n").getBytes();
+        byte[] footer = ("\r\n--" + boundary + "--\r\n").getBytes();
+        byte[] body   = new byte[header.length + fileBytes.length + footer.length];
+        System.arraycopy(header,    0, body, 0,                                header.length);
+        System.arraycopy(fileBytes, 0, body, header.length,                    fileBytes.length);
+        System.arraycopy(footer,    0, body, header.length + fileBytes.length, footer.length);
+
+        java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create(BASE_URL + "/upload"))
+                .header("Authorization", "Bearer " + token)
+                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofByteArray(body))
+                .build();
+
+        java.net.http.HttpResponse<String> resp = java.net.http.HttpClient.newHttpClient()
+                .send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+
+        // ← controlla status code: lancia eccezione leggibile se non è 200
+        if (resp.statusCode() != 200) {
+            throw new RuntimeException("Upload fallito (HTTP " + resp.statusCode()
+                    + "): " + resp.body());
+        }
+
+        return resp.body(); // {"url":"http://..."}
+    }
+
 
     public static String postAuth(String path, String json) throws Exception {
         HttpRequest request = HttpRequest.newBuilder()

@@ -32,7 +32,6 @@ public class UtentiDialog extends JDialog {
         styleTable(table);
         loadUsers();
 
-        // Admin: doppio click per modificare
         if (isAdmin) {
             table.addMouseListener(new java.awt.event.MouseAdapter() {
                 public void mouseClicked(java.awt.event.MouseEvent e) {
@@ -53,7 +52,6 @@ public class UtentiDialog extends JDialog {
         scroll.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
         scroll.getViewport().setBackground(new Color(160, 110, 210));
 
-        // Footer
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
         footer.setBackground(new Color(90, 0, 160));
 
@@ -88,7 +86,6 @@ public class UtentiDialog extends JDialog {
             JLabel hint = new JLabel("  ✏️ Doppio click per modificare");
             hint.setForeground(new Color(220, 200, 255));
             hint.setFont(new Font("SansSerif", Font.ITALIC, 11));
-
             footer.add(hint);
             footer.add(btnDelete);
         }
@@ -106,16 +103,36 @@ public class UtentiDialog extends JDialog {
         add(footer, BorderLayout.SOUTH);
     }
 
+    // ── converte enum DB → etichetta UI ──────────────────────
+    private String toDisplayRole(String raw) {
+        return switch (raw.toUpperCase()) {
+            case "ADMIN"           -> "ADMIN";
+            case "ASSIGNED_USER"   -> "USER 🔧";
+            case "UNASSIGNED_USER" -> "USER";
+            default                -> raw;
+        };
+    }
+
+    // ── converte etichetta UI → enum DB (per il salvataggio) ─
+    private String toRawRole(String display) {
+        return switch (display) {
+            case "ADMIN"    -> "ADMIN";
+            case "USER 🔧"  -> "ASSIGNED_USER";
+            default         -> "UNASSIGNED_USER";
+        };
+    }
+
     private void loadUsers() {
         model.setRowCount(0);
         try {
             String resp = ApiClient.get("/users");
             JsonNode arr = ApiClient.mapper.readTree(resp);
             for (JsonNode u : arr) {
+                String rawRole = u.path("role").asText("UNASSIGNED_USER");
                 model.addRow(new Object[]{
                         u.get("id").asText(),
                         u.get("email").asText(),
-                        u.path("role").asText("USER")
+                        toDisplayRole(rawRole)   // ← mostra etichetta leggibile
                 });
             }
         } catch (Exception ex) {
@@ -123,7 +140,7 @@ public class UtentiDialog extends JDialog {
         }
     }
 
-    private void editUser(Long id, String email, String role, int row) {
+    private void editUser(Long id, String email, String displayRole, int row) {
         JDialog edit = new JDialog(this, "Modifica utente", true);
         edit.setSize(340, 220);
         edit.setLocationRelativeTo(this);
@@ -134,8 +151,11 @@ public class UtentiDialog extends JDialog {
         g.fill = GridBagConstraints.HORIZONTAL;
 
         JTextField emailField = new JTextField(email, 18);
-        JComboBox<String> roleBox = new JComboBox<>(new String[]{"UNASSIGNED_USER", "ASSIGNED_USER", "ADMIN"});
-        roleBox.setSelectedItem(role);
+
+        // ── il combo mostra le etichette UI, non gli enum grezzi ──
+        JComboBox<String> roleBox = new JComboBox<>(
+                new String[]{"USER", "USER 🔧", "ADMIN"});
+        roleBox.setSelectedItem(displayRole);
 
         addRow(edit, g, 0, "Email:", emailField);
         addRow(edit, g, 1, "Ruolo:", roleBox);
@@ -150,11 +170,13 @@ public class UtentiDialog extends JDialog {
 
         save.addActionListener(ev -> {
             try {
+                String selectedDisplay = (String) roleBox.getSelectedItem();
+                String rawRole = toRawRole(selectedDisplay); // ← riconverti per il backend
                 String json = String.format("{\"email\":\"%s\",\"role\":\"%s\"}",
-                        emailField.getText().trim(), roleBox.getSelectedItem());
+                        emailField.getText().trim(), rawRole);
                 ApiClient.put("/users/" + id, json);
                 model.setValueAt(emailField.getText().trim(), row, 1);
-                model.setValueAt(roleBox.getSelectedItem(), row, 2);
+                model.setValueAt(selectedDisplay, row, 2);  // ← mostra etichetta in tabella
                 edit.dispose();
                 JOptionPane.showMessageDialog(this, "Utente aggiornato!");
             } catch (Exception ex) {

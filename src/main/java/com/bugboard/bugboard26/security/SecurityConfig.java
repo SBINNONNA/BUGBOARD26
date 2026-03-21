@@ -11,7 +11,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-@EnableMethodSecurity   // ← aggiungi questa riga
+
+@EnableMethodSecurity
 @Configuration
 public class SecurityConfig {
 
@@ -27,8 +28,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**").permitAll()  // login/register liberi
-                        .anyRequest().authenticated()                 // tutto il resto richiede JWT
+                        .requestMatchers("/api/auth/**", "/uploads/**").permitAll()
+                        .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

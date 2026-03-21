@@ -23,7 +23,7 @@ public class LoginFrame extends JFrame {
     public LoginFrame() {
         setTitle("BugBoard26 — Login");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
-        setSize(420, 520);
+        setSize(720, 777);
         setLocationRelativeTo(null);
         setResizable(true);
         getContentPane().setBackground(BG);

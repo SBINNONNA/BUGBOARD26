@@ -41,7 +41,6 @@ public class ProfiloDialog extends JDialog {
         nameL.setForeground(Color.WHITE);
         nameL.setAlignmentX(LEFT_ALIGNMENT);
 
-        // Badge ruolo colorato
         String role = parent.currentUserRole;
         JLabel roleL = new JLabel("  " + role + "  ");
         roleL.setFont(new Font("SansSerif", Font.BOLD, 11));
@@ -77,7 +76,6 @@ public class ProfiloDialog extends JDialog {
             addRow(body, g, 1, "🪪  ID",     "#" + n.get("id").asText());
             addRow(body, g, 2, "🔑  Ruolo",  n.path("role").asText("USER"));
 
-            // Issue assegnate nel progetto corrente
             Long projectId = ApiClient.getCurrentProjectId();
             String issResp = ApiClient.get("/projects/" + projectId + "/issues");
             JsonNode issues = ApiClient.mapper.readTree(issResp);
@@ -88,7 +86,7 @@ public class ProfiloDialog extends JDialog {
                 String assignedTo = iss.path("assignedTo").path("id").asText("");
                 if (assignedTo.equals(n.get("id").asText())) {
                     sb.append("• #").append(iss.get("id").asText())
-                      .append("  ").append(iss.get("title").asText()).append("\n");
+                            .append("  ").append(iss.get("title").asText()).append("\n");
                     count++;
                 }
             }
@@ -126,8 +124,63 @@ public class ProfiloDialog extends JDialog {
         JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER, 12, 10));
         footer.setBackground(FOOTER_BG);
 
+        // ── Cambia foto profilo ──
+        JButton changePhoto = styledBtn("📷 Cambia foto", new Color(85, 0, 155));
+        changePhoto.addActionListener(e -> {
+            JFileChooser fc = new JFileChooser();
+            fc.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(
+                    "Immagini", "jpg", "jpeg", "png"));
+            if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+            java.io.File f = fc.getSelectedFile();
+            new SwingWorker<String, Void>() {
+                @Override protected String doInBackground() throws Exception {
+                    return ApiClient.uploadFile(f);
+                }
+                @Override protected void done() {
+                    try {
+                        String raw = get();
+                        JsonNode resp = ApiClient.mapper.readTree(raw);
+                        String url = resp.path("url").asText("");
+
+                        if (url.isEmpty()) {
+                            JOptionPane.showMessageDialog(ProfiloDialog.this,
+                                    "Upload fallito: risposta non valida\n" + raw);
+                            return;
+                        }
+
+                        ApiClient.put("/users/me/picture",
+                                "{\"profilePicture\":\"" + url + "\"}");
+
+                        AvatarPanel.setAvatarUrl(url);
+
+                        SwingUtilities.invokeLater(() -> {
+                            getContentPane().removeAll();
+                            setLayout(new BorderLayout());
+                            add(buildHeader((DashboardFrame) getOwner()), BorderLayout.NORTH);
+                            add(buildBody(),   BorderLayout.CENTER);
+                            add(buildFooter(), BorderLayout.SOUTH);
+                            revalidate();
+                            repaint();
+                            ((DashboardFrame) getOwner()).repaint();
+                        });
+
+                        JOptionPane.showMessageDialog(ProfiloDialog.this, "Foto aggiornata! ✅");
+
+                    } catch (Exception ex) {
+                        SwingUtilities.invokeLater(() ->
+                                JOptionPane.showMessageDialog(ProfiloDialog.this,
+                                        "Errore: " + ex.getMessage(),
+                                        "Errore", JOptionPane.ERROR_MESSAGE));
+                    }
+                }
+            }.execute();  // ← senza questo lo SwingWorker non parte mai!
+
+        });
+
         JButton close = styledBtn("✖  Chiudi", new Color(120, 30, 180));
         close.addActionListener(e -> dispose());
+
+        footer.add(changePhoto);
         footer.add(close);
         return footer;
     }

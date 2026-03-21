@@ -3,54 +3,82 @@ package com.bugboard.bugboard26.ui;
 import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
-import java.awt.geom.Ellipse2D;
 import java.awt.image.BufferedImage;
-
-
+import java.net.URL;
 
 public class AvatarPanel extends JPanel {
 
-    private BufferedImage avatarImage = null;
+    private static String        currentAvatarUrl = null;
+    private static BufferedImage cachedImage      = null; // ← cache statica
+
     private final int size;
+
+    // ── chiamato da ProfiloDialog dopo upload ──
+    public static void setAvatarUrl(String url) {
+        if (url == null || url.equals(currentAvatarUrl)) return;
+        currentAvatarUrl = url;
+        cachedImage      = null;
+        new Thread(() -> {
+            try {
+                BufferedImage img = ImageIO.read(new URL(url));
+                if (img != null) {
+                    cachedImage = img;
+                    // ← sostituisci il lambda problematico con questo
+                    SwingUtilities.invokeLater(() -> {
+                        for (Window w : Window.getWindows()) {
+                            w.repaint();
+                        }
+                    });
+                }
+            } catch (Exception ignored) {}
+        }).start();
+    }
+
 
     public AvatarPanel(int size) {
         this.size = size;
-        setOpaque(false);
         setPreferredSize(new Dimension(size, size));
-        try {
-            // Carica da src/main/resources/images/avatar.png
-            var stream = getClass().getResourceAsStream("/images/avatar.png");
-            if (stream != null) avatarImage = ImageIO.read(stream);
-        } catch (Exception ignored) {}
+        setOpaque(false);
+
+        // se URL già impostato ma immagine non ancora caricata
+        if (currentAvatarUrl != null && cachedImage == null) {
+            new Thread(() -> {
+                try {
+                    BufferedImage img = ImageIO.read(new URL(currentAvatarUrl));
+                    if (img != null) {
+                        cachedImage = img;
+                        SwingUtilities.invokeLater(this::repaint);
+                    }
+                } catch (Exception ignored) {}
+            }).start();
+        }
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        Graphics2D g2 = (Graphics2D) g.create();
-        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        Graphics2D g2 = (Graphics2D) g.create(); // ← create() per non sporcare il contesto
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                RenderingHints.VALUE_ANTIALIAS_ON);
 
-        Ellipse2D circle = new Ellipse2D.Float(2, 2, size - 4, size - 4);
-        g2.setClip(circle);
+        // sfondo circolare
+        g2.setColor(new Color(100, 40, 160));
+        g2.fillOval(0, 0, size, size);
 
-        if (avatarImage != null) {
-            g2.drawImage(avatarImage, 2, 2, size - 4, size - 4, null);
+        if (cachedImage != null) {
+            // ritaglia in cerchio
+            g2.setClip(new java.awt.geom.Ellipse2D.Float(0, 0, size, size));
+            g2.drawImage(cachedImage, 0, 0, size, size, this);
         } else {
-            // Avatar generico
-            g2.setColor(new Color(200, 170, 240));
-            g2.fill(circle);
-            g2.setColor(new Color(255, 255, 255, 180));
-            // Testa
-            g2.fillOval(size/2 - 14, size/2 - 20, 28, 28);
-            // Corpo
-            g2.fillOval(size/2 - 22, size/2 + 8, 44, 36);
+            // fallback: lettera U
+            g2.setColor(Color.WHITE);
+            g2.setFont(new Font("SansSerif", Font.BOLD, size / 2));
+            FontMetrics fm = g2.getFontMetrics();
+            String letter = "U";
+            g2.drawString(letter,
+                    (size - fm.stringWidth(letter)) / 2,
+                    (size - fm.getHeight()) / 2 + fm.getAscent());
         }
-
-        g2.setClip(null);
-        // Bordo bianco
-        g2.setColor(new Color(255, 255, 255, 180));
-        g2.setStroke(new BasicStroke(2.5f));
-        g2.drawOval(2, 2, size - 4, size - 4);
         g2.dispose();
     }
 }

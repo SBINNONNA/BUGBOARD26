@@ -1,5 +1,5 @@
 package com.bugboard.bugboard26.controller;
-
+import java.security.Principal;
 import com.bugboard.bugboard26.model.Issue;
 import com.bugboard.bugboard26.service.IssueService;
 import org.springframework.http.HttpStatus;
@@ -39,10 +39,14 @@ public class IssueController {
                 Issue.IssueType.valueOf(body.get("type").toUpperCase()),
                 Issue.Priority.valueOf(body.get("priority").toUpperCase()),
                 userDetails.getUsername(),
-                assignedToId          // ← nuovo parametro
+                assignedToId,
+                body.get("imageUrl")   // ← AGGIUNTO
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(issue);
     }
+
+
+
 
     // Requisito 3 — Vista issue con filtri
     @GetMapping
@@ -75,7 +79,8 @@ public class IssueController {
                 Issue.Status.valueOf(body.get("status").toUpperCase()) : null;
         Issue updated = issueService.updateIssue(
                 id, body.get("title"), body.get("description"),
-                status, userDetails.getUsername());
+                status, userDetails.getUsername(),
+                body.get("imageUrl"));  // ← AGGIUNTO
         return ResponseEntity.ok(updated);
     }
 
@@ -102,4 +107,11 @@ public class IssueController {
         Issue updated = issueService.setDeadline(id, deadline, userDetails.getUsername());
         return ResponseEntity.ok(updated);
     }
+    @PatchMapping("/{issueId}/complete")
+    public ResponseEntity<?> completeIssue(@PathVariable Long projectId,
+                                           @PathVariable Long issueId,
+                                           Principal principal) {
+        return ResponseEntity.ok(issueService.completeIssue(issueId, principal.getName()));
+    }
+
 }

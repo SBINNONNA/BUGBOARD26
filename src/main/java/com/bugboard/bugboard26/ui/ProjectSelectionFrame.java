@@ -5,6 +5,8 @@ import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.HashSet;
+import java.util.Set;
 
 public class ProjectSelectionFrame extends JFrame {
 
@@ -18,9 +20,7 @@ public class ProjectSelectionFrame extends JFrame {
 
     private final JButton newBtn;
     private final JButton newUserBtn;
-    // ── AGGIUNGI campo (vicino a newBtn e newUserBtn) ──
     private final JButton allUsersBtn;
-
 
     public ProjectSelectionFrame() {
         setTitle("BugBoard26 — Scegli progetto");
@@ -43,9 +43,7 @@ public class ProjectSelectionFrame extends JFrame {
         allUsersBtn = new JButton("👥 Tutti gli Utenti");
         styleTopBtn(allUsersBtn);
         allUsersBtn.setVisible(false);
-// DOPO
         allUsersBtn.addActionListener(e -> new UtentiDialog(this, "ADMIN".equals(currentRole)).setVisible(true));
-
 
         add(buildTopBar(),  BorderLayout.NORTH);
         add(buildContent(), BorderLayout.CENTER);
@@ -100,7 +98,7 @@ public class ProjectSelectionFrame extends JFrame {
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
         btnPanel.setOpaque(false);
-        btnPanel.add(allUsersBtn);   // ← AGGIUNGI prima degli altri
+        btnPanel.add(allUsersBtn);
         btnPanel.add(newUserBtn);
         btnPanel.add(newBtn);
 
@@ -123,16 +121,45 @@ public class ProjectSelectionFrame extends JFrame {
 
     // ─── CARICAMENTO ─────────────────────────────────────────
     private void fetchRoleAndProjects() {
-        new SwingWorker<String[], Void>() {
-            @Override protected String[] doInBackground() throws Exception {
-                String me       = ApiClient.get("/users/me");
-                String projects = ApiClient.get("/projects");
-                return new String[]{me, projects};
+        new SwingWorker<Object[], Void>() {
+            @Override
+            protected Object[] doInBackground() throws Exception {
+                String meResp       = ApiClient.get("/users/me");
+                String projectsResp = ApiClient.get("/projects");
+                JsonNode me       = ApiClient.mapper.readTree(meResp);
+                JsonNode projects = ApiClient.mapper.readTree(projectsResp);
+
+                long myId = me.get("id").asLong();
+
+                // Per ogni progetto controlla se l'utente ha issue assegnate
+                Set<Long> projectsWithMyIssues = new HashSet<>();
+                for (JsonNode p : projects) {
+                    long projId = p.get("id").asLong();
+                    try {
+                        String issuesResp = ApiClient.get("/projects/" + projId + "/issues?");
+                        JsonNode issues = ApiClient.mapper.readTree(issuesResp);
+                        for (JsonNode issue : issues) {
+                            if (!issue.path("assignedTo").isNull() &&
+                                    issue.path("assignedTo").path("id").asLong() == myId &&
+                                    !"DONE".equals(issue.path("status").asText())) {
+                                projectsWithMyIssues.add(projId);
+                                break;
+                            }
+                        }
+                    } catch (Exception ignored) {}
+                }
+
+                return new Object[]{me, projects, projectsWithMyIssues};
             }
-            @Override protected void done() {
+
+            @Override
+            @SuppressWarnings("unchecked")
+            protected void done() {
                 try {
-                    String[] results = get();
-                    JsonNode me = ApiClient.mapper.readTree(results[0]);
+                    Object[]  results  = get();
+                    JsonNode  me       = (JsonNode) results[0];
+                    JsonNode  arr      = (JsonNode) results[1];
+                    Set<Long> myProjects = (Set<Long>) results[2];
 
                     String rawRole = "";
                     if (me.has("role"))             rawRole = me.get("role").asText("");
@@ -143,11 +170,9 @@ public class ProjectSelectionFrame extends JFrame {
                     if ("ADMIN".equals(currentRole)) {
                         newBtn.setVisible(true);
                         newUserBtn.setVisible(true);
-                        allUsersBtn.setVisible(true);  // ← AGGIUNGI questa riga
-
+                        allUsersBtn.setVisible(true);
                     }
 
-                    JsonNode arr = ApiClient.mapper.readTree(results[1]);
                     cardsPanel.removeAll();
                     if (arr.isEmpty()) {
                         JLabel empty = new JLabel("Nessun progetto disponibile.");
@@ -155,7 +180,10 @@ public class ProjectSelectionFrame extends JFrame {
                         empty.setFont(new Font("SansSerif", Font.ITALIC, 15));
                         cardsPanel.add(empty);
                     } else {
-                        for (JsonNode p : arr) addProjectCard(p);
+                        for (JsonNode p : arr) {
+                            boolean hasMyIssues = myProjects.contains(p.get("id").asLong());
+                            addProjectCard(p, hasMyIssues);
+                        }
                     }
                     cardsPanel.revalidate();
                     cardsPanel.repaint();
@@ -168,7 +196,7 @@ public class ProjectSelectionFrame extends JFrame {
     }
 
     // ─── CARD PROGETTO ────────────────────────────────────────
-    private void addProjectCard(JsonNode project) {
+    private void addProjectCard(JsonNode project, boolean hasAssignedIssues) {
         Long   id   = project.get("id").asLong();
         String name = project.get("name").asText();
         String desc = project.path("description").asText("Nessuna descrizione");
@@ -177,15 +205,28 @@ public class ProjectSelectionFrame extends JFrame {
         JPanel card = new JPanel(new BorderLayout(0, 8));
         card.setBackground(CARD_BG);
         card.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(18, new Color(120, 60, 190)),
+                new RoundedBorder(18, hasAssignedIssues
+                        ? new Color(255, 200, 0)      // ← bordo giallo se ha issue
+                        : new Color(120, 60, 190)),
                 BorderFactory.createEmptyBorder(18, 20, 18, 20)
         ));
         card.setPreferredSize(new Dimension(240, 160));
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
+        // ── Riga titolo + flag ──
+        JPanel nameRow = new JPanel(new BorderLayout(6, 0));
+        nameRow.setOpaque(false);
         JLabel nameLbl = new JLabel(name);
         nameLbl.setFont(new Font("SansSerif", Font.BOLD, 17));
         nameLbl.setForeground(Color.WHITE);
+        nameRow.add(nameLbl, BorderLayout.WEST);
+
+        if (hasAssignedIssues) {
+            JLabel flag = new JLabel("📌");
+            flag.setFont(new Font("SansSerif", Font.PLAIN, 16));
+            flag.setToolTipText("Hai issue assegnate in questo progetto");
+            nameRow.add(flag, BorderLayout.EAST);
+        }
 
         JLabel descLbl = new JLabel(
                 "<html><body style='width:190px'>" + desc + "</body></html>");
@@ -215,7 +256,7 @@ public class ProjectSelectionFrame extends JFrame {
             footer.add(del, BorderLayout.EAST);
         }
 
-        card.add(nameLbl, BorderLayout.NORTH);
+        card.add(nameRow, BorderLayout.NORTH);
         card.add(descLbl, BorderLayout.CENTER);
         card.add(footer,  BorderLayout.SOUTH);
 
@@ -239,11 +280,10 @@ public class ProjectSelectionFrame extends JFrame {
         g.insets = new Insets(8, 12, 8, 12);
         g.fill = GridBagConstraints.HORIZONTAL;
 
-        JTextField    emailField = new JTextField(20);
-        JPasswordField passField = new JPasswordField(20);
+        JTextField     emailField = new JTextField(20);
+        JPasswordField passField  = new JPasswordField(20);
         JComboBox<String> roleBox = new JComboBox<>(
-                new String[]{"UNASSIGNED_USER", "ADMIN"}  // ← aggiornati
-        );
+                new String[]{"UNASSIGNED_USER", "ADMIN"});
 
         styleField(emailField);
         styleField(passField);

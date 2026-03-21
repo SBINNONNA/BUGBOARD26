@@ -14,9 +14,9 @@ import java.util.List;
 @Service
 public class IssueService {
 
-    private final IssueRepository issueRepository;
-    private final UserRepository  userRepository;
-    private final ProjectRepository projectRepository;  // ← AGGIUNTO
+    private final IssueRepository   issueRepository;
+    private final UserRepository    userRepository;
+    private final ProjectRepository projectRepository;
 
     public IssueService(IssueRepository issueRepository,
                         UserRepository userRepository,
@@ -26,10 +26,31 @@ public class IssueService {
         this.projectRepository = projectRepository;
     }
 
-    // Requisito 2 — Crea issue nel progetto corretto
+    // ── UTILITY: promuovi utente ad ASSIGNED_USER ──────────
+    private void promoteToAssigned(User user) {
+        if (user.getRole() == User.Role.UNASSIGNED_USER) {
+            user.setRole(User.Role.ASSIGNED_USER);
+            userRepository.save(user);
+        }
+    }
+
+    // ── UTILITY: retrocedi se non ha altre issue attive ────
+    private void demoteIfFree(User user) {
+        if (user.getRole() == User.Role.ASSIGNED_USER) {
+            boolean hasOtherIssues = issueRepository
+                    .existsByAssignedToAndStatusNot(user, Issue.Status.DONE);
+            if (!hasOtherIssues) {
+                user.setRole(User.Role.UNASSIGNED_USER);
+                userRepository.save(user);
+            }
+        }
+    }
+
+    // ── Crea issue ─────────────────────────────────────────
     public Issue createIssue(Long projectId, String title, String description,
                              Issue.IssueType type, Issue.Priority priority,
-                             String creatorEmail, Long assignedToId) {   // ← aggiunto assignedToId
+                             String creatorEmail, Long assignedToId,
+                             String imageUrl) {   // ← AGGIUNTO
         User creator = userRepository.findByEmail(creatorEmail)
                 .orElseThrow(() -> new RuntimeException("Utente non trovato"));
         Project project = projectRepository.findById(projectId)
@@ -44,30 +65,32 @@ public class IssueService {
         issue.setStatus(Issue.Status.TODO);
         issue.setCreatedBy(creator);
 
-        // Solo l'admin può assegnare al momento della creazione
+        // ← AGGIUNTO
+        if (imageUrl != null && !imageUrl.isEmpty())
+            issue.setImageUrl(imageUrl);
+
         if (assignedToId != null && creator.getRole() == User.Role.ADMIN) {
             User assignee = userRepository.findById(assignedToId)
                     .orElseThrow(() -> new RuntimeException("Assegnatario non trovato"));
             issue.setAssignedTo(assignee);
             issue.setStatus(Issue.Status.IN_PROGRESS);
+            promoteToAssigned(assignee);
         }
 
         return issueRepository.save(issue);
     }
 
-
-
-    // Requisito 3 — Filtra issue per progetto
+    // ── Filtra issue ───────────────────────────────────────
     public List<Issue> getIssues(Long projectId, String keyword,
                                  Issue.IssueType type, Issue.Status status,
                                  Issue.Priority priority) {
         return issueRepository.findWithFilters(projectId, keyword, type, status, priority);
     }
 
-    // Requisito 9 — Modifica issue
-    // Requisito 9 — Modifica issue (aggiornato con auto-status)
+    // ── Modifica issue ─────────────────────────────────────
     public Issue updateIssue(Long issueId, String title, String description,
-                             Issue.Status status, String requesterEmail) {
+                             Issue.Status status, String requesterEmail,
+                             String imageUrl) {   // ← AGGIUNTO
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new RuntimeException("Issue non trovata"));
         User requester = userRepository.findByEmail(requesterEmail)
@@ -84,12 +107,14 @@ public class IssueService {
         if (description != null) issue.setDescription(description);
         if (status != null)      issue.setStatus(status);
 
-
+        // ← AGGIUNTO
+        if (imageUrl != null && !imageUrl.isEmpty())
+            issue.setImageUrl(imageUrl);
 
         return issueRepository.save(issue);
     }
 
-    // ✅ NUOVO — Assegna issue a un utente
+    // ── Assegna issue ──────────────────────────────────────
     public Issue assignIssue(Long issueId, Long userId, String requesterEmail) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new RuntimeException("Issue non trovata"));
@@ -99,21 +124,33 @@ public class IssueService {
         if (requester.getRole() != User.Role.ADMIN)
             throw new RuntimeException("Solo gli admin possono assegnare issue");
 
+        // ── Se c'era già un assegnatario, potrebbe diventare libero ──
+        User oldAssignee = issue.getAssignedTo();
+
         User assignee = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utente non trovato"));
 
         issue.setAssignedTo(assignee);
-        issue.setStatus(Issue.Status.IN_PROGRESS); // ← automatico
-        // ← AGGIUNGI: aggiunge l'utente ai membri del progetto se non c'è già
+        issue.setStatus(Issue.Status.IN_PROGRESS);
+
         if (!issue.getProject().getMembers().contains(assignee)) {
             issue.getProject().getMembers().add(assignee);
-            projectRepository.save(issue.getProject()); // ← AGGIUNGI
+            projectRepository.save(issue.getProject());
         }
-        return issueRepository.save(issue);
+
+        Issue saved = issueRepository.save(issue);
+
+        promoteToAssigned(assignee);  // ← promuovi nuovo assegnatario
+
+        // ── Retrocedi il vecchio solo se era diverso ──
+        if (oldAssignee != null && !oldAssignee.getId().equals(assignee.getId())) {
+            demoteIfFree(oldAssignee);
+        }
+
+        return saved;
     }
 
-
-    // Requisito 18 — Imposta deadline (solo admin)
+    // ── Deadline ───────────────────────────────────────────
     public Issue setDeadline(Long issueId, LocalDateTime deadline, String requesterEmail) {
         User requester = userRepository.findByEmail(requesterEmail)
                 .orElseThrow(() -> new RuntimeException("Utente non trovato"));
@@ -128,5 +165,31 @@ public class IssueService {
     public Issue getIssueById(Long id) {
         return issueRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Issue non trovata"));
+    }
+
+    // ── Completa issue ─────────────────────────────────────
+    public Issue completeIssue(Long issueId, String requesterEmail) {
+        Issue issue = issueRepository.findById(issueId)
+                .orElseThrow(() -> new RuntimeException("Issue non trovata"));
+        User requester = userRepository.findByEmail(requesterEmail)
+                .orElseThrow(() -> new RuntimeException("Utente non trovato"));
+
+        boolean isAdmin    = requester.getRole() == User.Role.ADMIN;
+        boolean isAssignee = requester.equals(issue.getAssignedTo());
+
+        if (!isAdmin && !isAssignee)
+            throw new RuntimeException("Non autorizzato");
+
+        User wasAssignee = issue.getAssignedTo(); // ← salva prima di nullare
+
+        issue.setStatus(Issue.Status.DONE);
+        issue.setAssignedTo(null);
+        Issue saved = issueRepository.save(issue);
+
+        if (wasAssignee != null) {
+            demoteIfFree(wasAssignee); // ← retrocedi se libero
+        }
+
+        return saved;
     }
 }

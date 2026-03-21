@@ -2,6 +2,7 @@ package com.bugboard.bugboard26.ui;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import javax.swing.*;
+import javax.swing.plaf.basic.BasicComboBoxUI;
 import java.awt.*;
 import java.awt.event.*;
 
@@ -11,11 +12,14 @@ public class DashboardFrame extends JFrame {
     static final Color SIDEBAR_BTN = new Color(125, 30, 205);
     static final Color MAIN_BG     = new Color(185, 150, 215);
     static final Color COL_BG      = new Color(148, 98, 192);
+    private JCheckBox onlyMineBox;
 
     private JPanel todoPanel, inProgressPanel, donePanel;
     private final JTextField searchField = new JTextField(12);
     private final JComboBox<String> priFilter = new JComboBox<>(
             new String[]{"Tutti", "P1", "P2", "P3", "P4", "P5"});
+    private final JComboBox<String> typeFilter = new JComboBox<>(
+            new String[]{"Tutti", "BUG", "QUESTION", "FEATURE", "DOCUMENTATION"});
 
     final JLabel userLabel = new JLabel("...", SwingConstants.CENTER);
     final JLabel roleLabel = new JLabel("",   SwingConstants.CENTER);
@@ -33,7 +37,10 @@ public class DashboardFrame extends JFrame {
         add(buildSidebar(), BorderLayout.WEST);
         add(buildMain(),    BorderLayout.CENTER);
         fetchCurrentUser();
-        SwingUtilities.invokeLater(this::loadIssues);
+
+        javax.swing.Timer t = new javax.swing.Timer(300, e -> loadIssues());
+        t.setRepeats(false);
+        t.start();
     }
 
     private void fetchCurrentUser() {
@@ -53,6 +60,13 @@ public class DashboardFrame extends JFrame {
                     currentUserRole = rawRole.toUpperCase().contains("ADMIN") ? "ADMIN" : "USER";
                     userLabel.setText(currentUserEmail.split("@")[0].toUpperCase());
                     roleLabel.setText(currentUserRole);
+
+                    if (onlyMineBox != null)
+                        onlyMineBox.setVisible(!"ADMIN".equals(currentUserRole));
+
+                    String pic = n.path("profilePicture").asText("");
+                    if (!pic.isEmpty()) AvatarPanel.setAvatarUrl(pic);
+
                 } catch (Exception ignored) {}
             }
         }.execute();
@@ -156,26 +170,53 @@ public class DashboardFrame extends JFrame {
 
         JPanel filterRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 4));
         filterRow.setOpaque(false);
-        JLabel flt = new JLabel("▼ filtra");
-        flt.setFont(new Font("SansSerif", Font.BOLD, 13));
-        flt.setForeground(new Color(70, 0, 130));
-        filterRow.add(flt);
-        filterRow.add(searchField);
+
+        styleCombo(priFilter);
+        styleCombo(typeFilter);
+
+        JLabel titleLbl = new JLabel("Titolo:");
+        titleLbl.setForeground(new Color(55, 0, 100));
+        titleLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+
+        searchField.setBackground(new Color(160, 110, 215));
+        searchField.setForeground(Color.WHITE);
+        searchField.setFont(new Font("SansSerif", Font.PLAIN, 13));
+        searchField.setBorder(BorderFactory.createCompoundBorder(
+                new javax.swing.border.LineBorder(new Color(190, 150, 240), 1, true),
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)));
+
         JLabel priLbl = new JLabel("Priorità:");
         priLbl.setForeground(new Color(55, 0, 100));
         priLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
-        filterRow.add(priLbl);
-        filterRow.add(priFilter);
-        JButton cerca    = topBtn("🔍 Cerca");
-        JButton nuova    = topBtn("＋ Issue");
-        JButton aggiorna = topBtn("↻");
+
+        JLabel typeLbl = new JLabel("Tipo:");
+        typeLbl.setForeground(new Color(55, 0, 100));
+        typeLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+
+        onlyMineBox = new JCheckBox("📌 Solo le mie");
+        onlyMineBox.setBackground(MAIN_BG);
+        onlyMineBox.setForeground(new Color(55, 0, 100));
+        onlyMineBox.setFont(new Font("SansSerif", Font.BOLD, 12));
+        onlyMineBox.setFocusPainted(false);
+        onlyMineBox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+
+        JButton cerca = topBtn("🔍 Cerca");
+        JButton nuova = topBtn("＋ Issue");
         cerca.addActionListener(e -> loadIssues());
-        aggiorna.addActionListener(e -> loadIssues());
         nuova.addActionListener(e -> {
             new IssueFormDialog(this, null).setVisible(true);
             loadIssues();
         });
-        filterRow.add(cerca); filterRow.add(nuova); filterRow.add(aggiorna);
+
+        filterRow.add(titleLbl);
+        filterRow.add(searchField);
+        filterRow.add(priLbl);
+        filterRow.add(priFilter);
+        filterRow.add(typeLbl);
+        filterRow.add(typeFilter);
+        filterRow.add(onlyMineBox);
+        filterRow.add(cerca);
+        filterRow.add(nuova);
 
         JPanel titleBlock = new JPanel(new BorderLayout());
         titleBlock.setOpaque(false);
@@ -203,6 +244,86 @@ public class DashboardFrame extends JFrame {
         b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         return b;
     }
+
+    // ── styleCombo con renderer viola ──────────────────────
+    private void styleCombo(JComboBox<String> box) {
+        Color bg      = new Color(110, 20, 180);
+        Color bgHover = new Color(140, 50, 210);
+
+        box.setBackground(bg);
+        box.setForeground(Color.WHITE);
+        box.setFont(new Font("SansSerif", Font.BOLD, 12));
+        box.setOpaque(true);
+
+        box.setRenderer(new DefaultListCellRenderer() {
+            @Override
+            public Component getListCellRendererComponent(JList<?> list, Object value,
+                                                          int index, boolean isSelected, boolean cellHasFocus) {
+                JLabel lbl = (JLabel) super.getListCellRendererComponent(
+                        list, value, index, isSelected, cellHasFocus);
+                lbl.setBackground(isSelected ? bgHover : bg);
+                lbl.setForeground(Color.WHITE);
+                lbl.setFont(new Font("SansSerif", Font.BOLD, 12));
+                lbl.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+                lbl.setOpaque(true);
+                return lbl;
+            }
+        });
+
+        box.setUI(new BasicComboBoxUI() {
+            @Override
+            protected JButton createArrowButton() {
+                JButton btn = new JButton() {
+                    @Override
+                    protected void paintComponent(Graphics g) {
+                        // sfondo viola
+                        g.setColor(new Color(140, 50, 210));
+                        g.fillRect(0, 0, getWidth(), getHeight());
+                        // freccia bianca disegnata a mano
+                        Graphics2D g2 = (Graphics2D) g;
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                                RenderingHints.VALUE_ANTIALIAS_ON);
+                        g2.setColor(Color.WHITE);
+                        int cx = getWidth()  / 2;
+                        int cy = getHeight() / 2;
+                        int[] xp = {cx - 5, cx + 5, cx};
+                        int[] yp = {cy - 3, cy - 3, cy + 3};
+                        g2.fillPolygon(xp, yp, 3);
+                    }
+                };
+                btn.setBorder(BorderFactory.createEmptyBorder());
+                btn.setFocusPainted(false);
+                btn.setContentAreaFilled(false); // ← lascia che paintComponent faccia tutto
+                btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+                return btn;
+            }
+
+
+            // ← fix: forza colore testo anche nella casella chiusa
+            @Override
+            public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
+                ListCellRenderer<Object> renderer = comboBox.getRenderer();
+                Component c = renderer.getListCellRendererComponent(
+                        listBox, comboBox.getSelectedItem(), -1, false, false);
+                c.setFont(comboBox.getFont());
+                if (c instanceof JLabel lbl) {
+                    lbl.setForeground(Color.WHITE);
+                    lbl.setBackground(bg);
+                    lbl.setOpaque(true);
+                }
+                currentValuePane.paintComponent(g, c, comboBox,
+                        bounds.x, bounds.y, bounds.width, bounds.height, false);
+            }
+
+            @Override
+            public void paintCurrentValueBackground(Graphics g, Rectangle bounds,
+                                                    boolean hasFocus) {
+                g.setColor(bg);
+                g.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+            }
+        });
+    }
+
 
     // ─── KANBAN ────────────────────────────────────────────
     private JPanel buildKanban() {
@@ -247,37 +368,55 @@ public class DashboardFrame extends JFrame {
         inProgressPanel.removeAll();
         donePanel.removeAll();
 
-        new SwingWorker<String, Void>() {
-            @Override protected String doInBackground() throws Exception {
+        final boolean onlyMine = onlyMineBox != null && onlyMineBox.isSelected();
+
+        new SwingWorker<java.util.List<Object[]>, Void>() {
+            @Override
+            protected java.util.List<Object[]> doInBackground() throws Exception {
                 StringBuilder url = new StringBuilder(
                         "/projects/" + ApiClient.getCurrentProjectId() + "/issues?");
                 String kw = searchField.getText().trim();
                 if (!kw.isEmpty()) url.append("keyword=").append(kw).append("&");
                 String pr = (String) priFilter.getSelectedItem();
                 if (!"Tutti".equals(pr)) url.append("priority=").append(pr).append("&");
-                return ApiClient.get(url.toString());
+                String tp = (String) typeFilter.getSelectedItem();
+                if (!"Tutti".equals(tp)) url.append("type=").append(tp).append("&");
+
+                String resp = ApiClient.get(url.toString());
+                JsonNode arr = ApiClient.mapper.readTree(resp);
+
+                java.util.List<Object[]> result = new java.util.ArrayList<>();
+                for (JsonNode issue : arr) {
+                    if (onlyMine) {
+                        boolean assignedToMe = !issue.path("assignedTo").isNull()
+                                && issue.path("assignedTo").path("id").asLong(-1)
+                                == (currentUserId != null ? currentUserId : -2L);
+                        if (!assignedToMe) continue;
+                    }
+                    long id = issue.get("id").asLong();
+                    int commentCount = 0;
+                    try {
+                        String cr = ApiClient.get("/projects/" + ApiClient.getCurrentProjectId()
+                                + "/issues/" + id + "/comments");
+                        commentCount = ApiClient.mapper.readTree(cr).size();
+                    } catch (Exception ignored) {}
+                    result.add(new Object[]{issue, commentCount});
+                }
+                return result;
             }
-            @Override protected void done() {
+
+            @Override
+            protected void done() {
                 try {
-                    JsonNode arr = ApiClient.mapper.readTree(get());
-                    for (JsonNode issue : arr) {
-                        JPanel card = buildCard(issue);
-
-                        String   status     = issue.get("status").asText();
-                        JsonNode assignedTo = issue.path("assignedTo");
-
-                        // ✅ LOGICA SMISTAMENTO:
-                        // DONE → RISOLTE
-                        // assignedTo presente → IN CORSO
-                        // nessun assegnatario → DA RISOLVERE
-                        boolean isAssigned = !assignedTo.isNull()
-                                && !assignedTo.isMissingNode()
-                                && assignedTo.has("id");
-
+                    for (Object[] entry : get()) {
+                        JsonNode issue        = (JsonNode) entry[0];
+                        int      commentCount = (int)      entry[1];
+                        JPanel   card         = buildCard(issue, commentCount);
+                        String   status       = issue.get("status").asText();
                         if ("DONE".equals(status)) {
                             donePanel.add(card);
                             donePanel.add(Box.createVerticalStrut(8));
-                        } else if (isAssigned) {
+                        } else if ("IN_PROGRESS".equals(status)) {
                             inProgressPanel.add(card);
                             inProgressPanel.add(Box.createVerticalStrut(8));
                         } else {
@@ -285,59 +424,61 @@ public class DashboardFrame extends JFrame {
                             todoPanel.add(Box.createVerticalStrut(8));
                         }
                     }
-                    todoPanel.revalidate();
-                    inProgressPanel.revalidate();
-                    donePanel.revalidate();
-                    repaint();
+                    todoPanel.revalidate();       todoPanel.repaint();
+                    inProgressPanel.revalidate(); inProgressPanel.repaint();
+                    donePanel.revalidate();       donePanel.repaint();
+                    revalidate(); repaint();
                 } catch (Exception ex) {
                     JOptionPane.showMessageDialog(DashboardFrame.this,
-                            "Errore caricamento issue: " + ex.getMessage());
+                            "Errore: " + ex.getMessage());
                 }
             }
         }.execute();
     }
 
     // ─── CARD ──────────────────────────────────────────────
-    private JPanel buildCard(JsonNode issue) {
+    private JPanel buildCard(JsonNode issue, int commentCount) {
         Long   id       = issue.get("id").asLong();
         String title    = issue.get("title").asText();
         String type     = issue.get("type").asText();
         String priority = issue.get("priority").asText();
 
+        boolean isAssignedToMe = !issue.path("assignedTo").isNull()
+                && issue.path("assignedTo").path("id").asLong() == currentUserId;
+
         JPanel card = new JPanel(new BorderLayout(6, 4));
         card.setBackground(new Color(160, 112, 205));
         card.setBorder(BorderFactory.createCompoundBorder(
-                new RoundedBorder(14, new Color(130, 80, 190)),
-                BorderFactory.createEmptyBorder(10, 12, 10, 12)
-        ));
+                new RoundedBorder(14, isAssignedToMe
+                        ? new Color(255, 200, 0)
+                        : new Color(130, 80, 190)),
+                BorderFactory.createEmptyBorder(10, 12, 10, 12)));
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        // Titolo + avatar
         JPanel topRow = new JPanel(new BorderLayout());
         topRow.setOpaque(false);
+
+        JPanel titlePanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        titlePanel.setOpaque(false);
+        if (isAssignedToMe) {
+            JLabel flag = new JLabel("📌");
+            flag.setFont(new Font("SansSerif", Font.PLAIN, 13));
+            flag.setToolTipText("Questa issue è assegnata a te");
+            titlePanel.add(flag);
+        }
         JLabel titleLbl = new JLabel("#" + id + "  " + title);
         titleLbl.setFont(new Font("SansSerif", Font.BOLD, 14));
         titleLbl.setForeground(Color.WHITE);
-        topRow.add(titleLbl, BorderLayout.WEST);
-        topRow.add(new AvatarPanel(28), BorderLayout.EAST);
+        titlePanel.add(titleLbl);
+        topRow.add(titlePanel, BorderLayout.WEST);
 
-        // Tipo
         JLabel typeLbl = new JLabel(type);
         typeLbl.setFont(new Font("SansSerif", Font.PLAIN, 12));
         typeLbl.setForeground(new Color(220, 200, 255));
 
-        // Bottom row: commenti + priorità
         JPanel botRow = new JPanel(new BorderLayout());
         botRow.setOpaque(false);
-
-        int commentCount = 0;
-        try {
-            String resp = ApiClient.get("/projects/" + ApiClient.getCurrentProjectId()
-                    + "/issues/" + id + "/comments");
-            JsonNode comments = ApiClient.mapper.readTree(resp);
-            commentCount = comments.size();
-        } catch (Exception ignored) {}
 
         JLabel commentIcon = new JLabel("💬 " + commentCount);
         commentIcon.setForeground(Color.WHITE);
@@ -368,9 +509,9 @@ public class DashboardFrame extends JFrame {
 
     private Color getPriorityColor(String priority) {
         return switch (priority) {
-            case "P1", "P2" -> new Color(127, 0, 255);   // 🟢 verde
-            case "P3"       -> new Color(128, 0, 255);    // 🟡 giallo
-            case "P4", "P5" -> new Color(130, 0, 255);    // 🔴 rosso
+            case "P1", "P2" -> new Color(127, 0, 255);
+            case "P3"       -> new Color(128, 0, 255);
+            case "P4", "P5" -> new Color(130, 0, 255);
             default         -> Color.WHITE;
         };
     }

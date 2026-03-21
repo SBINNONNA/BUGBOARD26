@@ -9,6 +9,11 @@ import jakarta.validation.constraints.NotBlank;
 @Entity
 @Table(name = "users")
 public class User {
+    @Column(name = "profile_picture")
+    private String profilePicture;
+
+    // getter e setter
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -45,4 +50,6 @@ public class User {
 
     public Role getRole() { return role; }
     public void setRole(Role role) { this.role = role; }
+    public String getProfilePicture() { return profilePicture; }
+    public void setProfilePicture(String profilePicture) { this.profilePicture = profilePicture; }
 }
