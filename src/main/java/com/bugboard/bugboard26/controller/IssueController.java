@@ -68,7 +68,6 @@ public class IssueController {
         return ResponseEntity.ok(issueService.getIssueById(id));
     }
 
-    // Requisito 9 — Modifica issue (titolo, descrizione, stato)
     @PutMapping("/{id}")
     public ResponseEntity<Issue> updateIssue(
             @PathVariable Long projectId,
@@ -80,7 +79,8 @@ public class IssueController {
         Issue updated = issueService.updateIssue(
                 id, body.get("title"), body.get("description"),
                 status, userDetails.getUsername(),
-                body.get("imageUrl"));  // ← AGGIUNTO
+                body.get("imageUrl"),
+                body.get("deadline")); // ← aggiunto
         return ResponseEntity.ok(updated);
     }
 

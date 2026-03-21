@@ -6,6 +6,9 @@ import java.awt.*;
 
 public class NotificheDialog extends JDialog {
 
+    // ← persiste per tutta la sessione, si resetta al logout
+    static final java.util.Set<String> dismissedComments = new java.util.HashSet<>();
+
     public NotificheDialog(DashboardFrame parent) {
         super(parent, "Notifiche", true);
         setSize(500, 450);
@@ -60,11 +63,17 @@ public class NotificheDialog extends JDialog {
                             + "/issues/" + iss.get("id").asText() + "/comments");
                     JsonNode comments = ApiClient.mapper.readTree(cResp);
                     for (JsonNode c : comments) {
+                        String commentId = c.get("id").asText();
+
+                        // ← salta se già dismissato
+                        if (dismissedComments.contains(commentId)) continue;
+
                         addDismissibleCard(listPanel,
                                 "  [#" + iss.get("id").asText() + "] "
                                         + c.path("author").path("email").asText()
                                         + ": " + c.get("text").asText(),
-                                new Color(155, 100, 215));
+                                new Color(155, 100, 215),
+                                commentId);
                         anyComment = true;
                     }
                 } catch (Exception ignored) {}
@@ -113,8 +122,8 @@ public class NotificheDialog extends JDialog {
         p.add(Box.createVerticalStrut(6));
     }
 
-    // ── card con ✕ che rimuove solo la notifica visivamente ─
-    private void addDismissibleCard(JPanel p, String text, Color bg) {
+    // ── card con X disegnata a mano ────────────────────────
+    private void addDismissibleCard(JPanel p, String text, Color bg, String commentId) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.setOpaque(true);
         row.setBackground(bg);
@@ -128,23 +137,37 @@ public class NotificheDialog extends JDialog {
         lbl.setForeground(Color.WHITE);
         lbl.setOpaque(false);
 
-        JButton del = new JButton("\uD83D\uDDD1");
-        del.setFont(new Font("SansSerif", Font.BOLD, 10));
-        del.setBackground(new Color(180, 40, 40));
-        del.setForeground(Color.WHITE);
-        del.setFocusPainted(false);
+        // ← X disegnata a mano, funziona su tutti i sistemi
+        JButton del = new JButton() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
+                        RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(180, 40, 40));
+                g2.fillRoundRect(0, 0, getWidth(), getHeight(), 6, 6);
+                g2.setColor(Color.WHITE);
+                g2.setStroke(new BasicStroke(2f));
+                int m = 7;
+                g2.drawLine(m, m, getWidth() - m, getHeight() - m);
+                g2.drawLine(getWidth() - m, m, m, getHeight() - m);
+                g2.dispose();
+            }
+        };
+        del.setContentAreaFilled(false);
         del.setBorderPainted(false);
+        del.setFocusPainted(false);
         del.setPreferredSize(new Dimension(28, 24));
         del.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
         del.addActionListener(e -> {
-            // ← rimuove solo la card visivamente, commento intatto nel DB
+            dismissedComments.add(commentId); // ← memorizza per questa sessione
             Component[] comps = p.getComponents();
             for (int i = 0; i < comps.length; i++) {
                 if (comps[i] == row) {
                     p.remove(row);
                     if (i < p.getComponentCount())
-                        p.remove(p.getComponent(i)); // rimuove lo strut
+                        p.remove(p.getComponent(i));
                     break;
                 }
             }

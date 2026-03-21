@@ -16,13 +16,15 @@ public class IssueFormDialog extends JDialog {
     private String selectedImageUrl = null;
     private JLabel imagePreview;
 
+    // ← commentsPanel sostituisce la vecchia JTextArea
+    private JPanel commentsPanel;
+
     private final JTextField        titleField    = new JTextField(25);
     private final JTextArea         descArea      = new JTextArea(4, 25);
     private final JComboBox<String> typeBox       = new JComboBox<>(
             new String[]{"BUG", "QUESTION", "FEATURE", "DOCUMENTATION"});
     private final JComboBox<String> priorityBox   = new JComboBox<>(
             new String[]{"P1", "P2", "P3", "P4", "P5"});
-    private final JTextArea         commentsArea  = new JTextArea(4, 25);
     private final JTextField        commentField  = new JTextField(20);
     private final JTextField        deadlineField = new JTextField("gg/mm/aaaa", 15);
     private final JComboBox<UserEntry> assigneeBox = new JComboBox<>();
@@ -41,13 +43,24 @@ public class IssueFormDialog extends JDialog {
 
     public IssueFormDialog(DashboardFrame parent, Long issueId) {
         super(parent, issueId == null ? "Nuova Issue" : "Issue #" + issueId, true);
-        this.issueId = issueId;
-        this.parent  = parent;
-        this.isAdmin = "ADMIN".equals(parent.currentUserRole);
-        setSize(520, issueId == null ? 540 : 700);
+        this.issueId  = issueId;
+        this.parent   = parent;
+        this.isAdmin  = "ADMIN".equals(parent.currentUserRole);
+        setSize(520, issueId == null ? 540 : 750);
         setLocationRelativeTo(parent);
         if (isAdmin) loadUsers();
         buildUI();
+
+        // ── Campi in sola lettura per utenti normali su issue esistenti ──
+        if (issueId != null && !isAdmin) {
+            titleField.setEditable(false);
+            titleField.setBackground(new Color(235, 225, 250));
+            descArea.setEditable(false);
+            descArea.setBackground(new Color(235, 225, 250));
+            typeBox.setEnabled(false);
+            priorityBox.setEnabled(false);
+        }
+
         if (issueId != null) loadIssue();
     }
 
@@ -108,6 +121,8 @@ public class IssueFormDialog extends JDialog {
         pickImg.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         pickImg.addActionListener(e -> pickImage());
 
+        if (issueId != null && !isAdmin) pickImg.setVisible(false);
+
         JPanel imgPanel = new JPanel(new BorderLayout(8, 0));
         imgPanel.setOpaque(false);
         imgPanel.add(pickImg,      BorderLayout.WEST);
@@ -118,17 +133,25 @@ public class IssueFormDialog extends JDialog {
         g.gridx = 1;
         panel.add(imgPanel, g);
         row++;
-        // ─────────────────────────────────────────────────
 
         if (issueId != null) {
+
+            // ── Sezione commenti come pannello card ────────
             g.gridx = 0; g.gridy = row;
             panel.add(new JLabel("Commenti:"), g);
-            commentsArea.setEditable(false);
-            commentsArea.setBackground(new Color(245, 245, 245));
+
+            commentsPanel = new JPanel();
+            commentsPanel.setLayout(new BoxLayout(commentsPanel, BoxLayout.Y_AXIS));
+            commentsPanel.setBackground(new Color(245, 242, 255));
+
+            JScrollPane commentsScroll = new JScrollPane(commentsPanel);
+            commentsScroll.setPreferredSize(new Dimension(350, 130));
+            commentsScroll.setBorder(BorderFactory.createLineBorder(new Color(160, 110, 220)));
             g.gridx = 1;
-            panel.add(new JScrollPane(commentsArea), g);
+            panel.add(commentsScroll, g);
             row++;
 
+            // ── Campo aggiungi commento ────────────────────
             g.gridx = 0; g.gridy = row;
             panel.add(new JLabel("Aggiungi:"), g);
             g.gridx = 1;
@@ -140,13 +163,13 @@ public class IssueFormDialog extends JDialog {
             sendBtn.addActionListener(e -> sendComment());
             row++;
 
-            // ── Immagine allegata (visualizza se esiste) ──
+            // ── Allegato ──────────────────────────────────
             g.gridx = 0; g.gridy = row;
             panel.add(new JLabel("Allegato:"), g);
             JLabel existingImg = new JLabel("Nessuna immagine allegata");
             existingImg.setForeground(new Color(130, 80, 180));
             existingImg.setFont(new Font("SansSerif", Font.ITALIC, 11));
-            existingImg.setName("existingImg"); // per loadIssue
+            existingImg.setName("existingImg");
             g.gridx = 1;
             panel.add(existingImg, g);
             row++;
@@ -173,15 +196,18 @@ public class IssueFormDialog extends JDialog {
             row++;
         }
 
-        JButton saveBtn = new JButton(issueId == null ? "Crea Issue" : "Salva Modifiche");
-        saveBtn.setBackground(new Color(85, 0, 155));
-        saveBtn.setForeground(Color.WHITE);
-        saveBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
-        saveBtn.setFocusPainted(false);
-        saveBtn.setBorderPainted(false);
-        g.gridx = 0; g.gridy = row; g.gridwidth = 2;
-        panel.add(saveBtn, g);
-        saveBtn.addActionListener(e -> save());
+        // ── "Crea Issue" a tutti, "Salva Modifiche" solo ADMIN ──
+        if ((issueId == null) || isAdmin) {
+            JButton saveBtn = new JButton(issueId == null ? "Crea Issue" : "Salva Modifiche");
+            saveBtn.setBackground(new Color(85, 0, 155));
+            saveBtn.setForeground(Color.WHITE);
+            saveBtn.setFont(new Font("SansSerif", Font.BOLD, 13));
+            saveBtn.setFocusPainted(false);
+            saveBtn.setBorderPainted(false);
+            g.gridx = 0; g.gridy = row; g.gridwidth = 2;
+            panel.add(saveBtn, g);
+            saveBtn.addActionListener(e -> save());
+        }
 
         add(new JScrollPane(panel));
     }
@@ -194,15 +220,12 @@ public class IssueFormDialog extends JDialog {
         if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
 
         java.io.File f = fc.getSelectedFile();
-
-        // mostra preview subito
         ImageIcon icon = new ImageIcon(
                 new ImageIcon(f.getAbsolutePath()).getImage()
                         .getScaledInstance(80, 60, Image.SCALE_SMOOTH));
         imagePreview.setIcon(icon);
         imagePreview.setText("");
 
-        // carica in background
         new SwingWorker<String, Void>() {
             @Override protected String doInBackground() throws Exception {
                 return ApiClient.uploadFile(f);
@@ -257,12 +280,9 @@ public class IssueFormDialog extends JDialog {
                 }
             }
 
-            // ── Mostra immagine esistente ──
             String imgUrl = n.path("imageUrl").asText("");
             if (!imgUrl.isEmpty()) {
                 selectedImageUrl = imgUrl;
-
-                // mostra preview nell'imagePreview già presente nel form
                 new Thread(() -> {
                     try {
                         java.awt.image.BufferedImage img =
@@ -276,7 +296,6 @@ public class IssueFormDialog extends JDialog {
                                 imagePreview.setToolTipText(imgUrl);
                                 imagePreview.setCursor(
                                         Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                                // click → apre immagine a schermo intero
                                 imagePreview.addMouseListener(new java.awt.event.MouseAdapter() {
                                     public void mouseClicked(java.awt.event.MouseEvent e) {
                                         showFullImage(imgUrl);
@@ -287,7 +306,6 @@ public class IssueFormDialog extends JDialog {
                     } catch (Exception ignored) {}
                 }).start();
             }
-
 
             if (doneBtn != null) {
                 boolean isDone     = "DONE".equals(n.get("status").asText());
@@ -302,34 +320,147 @@ public class IssueFormDialog extends JDialog {
         }
     }
 
-    // cerca ricorsivamente la JLabel "existingImg" e aggiorna il testo
-    private void findExistingImgLabel(Container container, String url) {
-        for (Component c : container.getComponents()) {
-            if (c instanceof JLabel lbl && "existingImg".equals(lbl.getName())) {
-                lbl.setText("<html><a href=''>" + url + "</a></html>");
-                lbl.setToolTipText(url);
-                return;
-            }
-            if (c instanceof Container inner) findExistingImgLabel(inner, url);
-        }
-    }
-
-    // ─── Commenti ──────────────────────────────────────────
+    // ─── Carica commenti come card ─────────────────────────
     private void loadComments() {
         try {
             String   resp = ApiClient.get(issueBase() + "/" + issueId + "/comments");
             JsonNode arr  = ApiClient.mapper.readTree(resp);
-            StringBuilder sb = new StringBuilder();
-            for (JsonNode c : arr) {
-                sb.append("[").append(c.path("author").path("email").asText()).append("] ");
-                sb.append(c.get("text").asText()).append("\n");
+
+            commentsPanel.removeAll();
+
+            if (!arr.isArray() || arr.size() == 0) {
+                JLabel empty = new JLabel("  Nessun commento");
+                empty.setFont(new Font("SansSerif", Font.ITALIC, 11));
+                empty.setForeground(Color.GRAY);
+                commentsPanel.add(empty);
             }
-            commentsArea.setText(sb.toString());
+
+            for (JsonNode c : arr) {
+                long   authorId    = c.path("author").path("id").asLong(-1);
+                String authorEmail = c.path("author").path("email").asText("?");
+                String commentText = c.get("text").asText();
+                long   commentId   = c.get("id").asLong();
+
+                boolean isOwner = (authorId == parent.currentUserId);
+                boolean canEdit = isOwner;                    // solo l'autore modifica
+                boolean canDelete = isOwner || isAdmin;       // autore o admin cancella
+
+                // ── card del commento ──────────────────────
+                JPanel card = new JPanel(new BorderLayout(6, 0));
+                card.setBackground(new Color(235, 225, 255));
+                card.setBorder(BorderFactory.createCompoundBorder(
+                        BorderFactory.createLineBorder(new Color(180, 140, 220)),
+                        BorderFactory.createEmptyBorder(5, 8, 5, 8)));
+                card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 60));
+
+                JLabel textLbl = new JLabel(
+                        "<html><b>" + authorEmail + "</b>: " + commentText + "</html>");
+                textLbl.setFont(new Font("SansSerif", Font.PLAIN, 11));
+                card.add(textLbl, BorderLayout.CENTER);
+
+                // ── bottoni azione ────────────────────────
+                JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
+                actions.setOpaque(false);
+
+                if (canEdit) {
+                    JButton editBtn = smallBtn("✏", new Color(100, 60, 200));
+                    editBtn.setToolTipText("Modifica commento");
+                    editBtn.addActionListener(e ->
+                            editComment(commentId, commentText, textLbl, authorEmail));
+                    actions.add(editBtn);
+                }
+
+                if (canDelete) {
+                    JButton delBtn = smallBtn("🗑", new Color(180, 40, 40));
+                    delBtn.setToolTipText("Elimina commento");
+                    delBtn.addActionListener(e -> deleteComment(commentId, card));
+                    actions.add(delBtn);
+                }
+
+                card.add(actions, BorderLayout.EAST);
+                commentsPanel.add(card);
+                commentsPanel.add(Box.createVerticalStrut(4));
+            }
+
+            commentsPanel.revalidate();
+            commentsPanel.repaint();
+
         } catch (Exception ex) {
-            commentsArea.setText("Errore caricamento commenti");
+            JLabel err = new JLabel("  Errore caricamento commenti");
+            err.setForeground(Color.RED);
+            commentsPanel.add(err);
         }
     }
 
+    // ─── Helper bottone piccolo ────────────────────────────
+    private JButton smallBtn(String icon, Color bg) {
+        JButton btn = new JButton(icon);
+        btn.setFont(new Font("SansSerif", Font.PLAIN, 11));
+        btn.setBackground(bg);
+        btn.setForeground(Color.WHITE);
+        btn.setFocusPainted(false);
+        btn.setBorderPainted(false);
+        btn.setPreferredSize(new Dimension(30, 24));
+        btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        return btn;
+    }
+
+    // ─── Modifica commento ─────────────────────────────────
+    private void editComment(long commentId, String oldText,
+                             JLabel textLbl, String authorEmail) {
+        String newText = (String) JOptionPane.showInputDialog(
+                this, "Modifica il commento:",
+                "Modifica commento", JOptionPane.PLAIN_MESSAGE,
+                null, null, oldText);
+
+        if (newText == null || newText.trim().isEmpty()) return;
+        newText = newText.trim();
+
+        try {
+            // ← usa il mapper invece di String.format: gestisce ", \n, \ ecc.
+            String json = ApiClient.mapper.writeValueAsString(
+                    java.util.Map.of("text", newText));
+
+            ApiClient.put(issueBase() + "/" + issueId + "/comments/" + commentId, json);
+
+            final String finalText = newText;
+            textLbl.setText("<html><b>" + authorEmail + "</b>: " + finalText + "</html>");
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Errore modifica: " + ex.getMessage());
+        }
+    }
+
+
+    // ─── Elimina commento ──────────────────────────────────
+    private void deleteComment(long commentId, JPanel card) {
+        int confirm = JOptionPane.showConfirmDialog(
+                this,
+                "Eliminare questo commento?",
+                "Conferma eliminazione",
+                JOptionPane.YES_NO_OPTION);
+        if (confirm != JOptionPane.YES_OPTION) return;
+
+        try {
+            ApiClient.delete(issueBase() + "/" + issueId + "/comments/" + commentId);
+            // rimuove la card + il relativo strut
+            Container parent = card.getParent();
+            Component[] comps = parent.getComponents();
+            for (int i = 0; i < comps.length; i++) {
+                if (comps[i] == card) {
+                    parent.remove(card);
+                    if (i < parent.getComponentCount())
+                        parent.remove(parent.getComponent(i));
+                    break;
+                }
+            }
+            commentsPanel.revalidate();
+            commentsPanel.repaint();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, "Errore eliminazione: " + ex.getMessage());
+        }
+    }
+
+    // ─── Invia commento ────────────────────────────────────
     private void sendComment() {
         String text = commentField.getText().trim();
         if (text.isEmpty()) return;
@@ -354,7 +485,6 @@ public class IssueFormDialog extends JDialog {
 
         try {
             if (issueId == null) {
-                // ── CREAZIONE ──
                 StringBuilder json = new StringBuilder();
                 json.append(String.format(
                         "{\"title\":\"%s\",\"description\":\"%s\",\"type\":\"%s\",\"priority\":\"%s\"",
@@ -362,7 +492,6 @@ public class IssueFormDialog extends JDialog {
                         typeBox.getSelectedItem(),
                         priorityBox.getSelectedItem()));
 
-                // immagine allegata
                 if (selectedImageUrl != null && !selectedImageUrl.isEmpty())
                     json.append(",\"imageUrl\":\"").append(selectedImageUrl).append("\"");
 
@@ -374,12 +503,10 @@ public class IssueFormDialog extends JDialog {
                     if (dl != null) json.append(",\"deadline\":\"").append(dl).append("\"");
                 }
                 json.append("}");
-
                 ApiClient.postAuth(issueBase(), json.toString());
                 JOptionPane.showMessageDialog(this, "Issue creata!");
 
             } else {
-                // ── MODIFICA ──
                 StringBuilder jsonUpdate = new StringBuilder();
                 jsonUpdate.append(String.format(
                         "{\"title\":\"%s\",\"description\":\"%s\"", title, desc));
@@ -387,22 +514,17 @@ public class IssueFormDialog extends JDialog {
                 if (selectedImageUrl != null && !selectedImageUrl.isEmpty())
                     jsonUpdate.append(",\"imageUrl\":\"").append(selectedImageUrl).append("\"");
 
-                if (isAdmin) {
-                    String dl = parseDeadline(deadlineField.getText().trim());
-                    if (dl != null) jsonUpdate.append(",\"deadline\":\"").append(dl).append("\"");
-                }
+                String dl = parseDeadline(deadlineField.getText().trim());
+                if (dl != null) jsonUpdate.append(",\"deadline\":\"").append(dl).append("\"");
                 jsonUpdate.append("}");
 
                 ApiClient.put(issueBase() + "/" + issueId, jsonUpdate.toString());
 
-                if (isAdmin) {
-                    UserEntry selected = (UserEntry) assigneeBox.getSelectedItem();
-                    if (selected != null && selected.id > 0) {
-                        String jsonAssign = String.format("{\"userId\":\"%d\"}", selected.id);
-                        ApiClient.patch(issueBase() + "/" + issueId + "/assign", jsonAssign);
-                    }
+                UserEntry selected = (UserEntry) assigneeBox.getSelectedItem();
+                if (selected != null && selected.id > 0) {
+                    String jsonAssign = String.format("{\"userId\":\"%d\"}", selected.id);
+                    ApiClient.patch(issueBase() + "/" + issueId + "/assign", jsonAssign);
                 }
-
                 JOptionPane.showMessageDialog(this, "Issue aggiornata!");
             }
             dispose();
@@ -418,10 +540,10 @@ public class IssueFormDialog extends JDialog {
             String[] p = input.split("/");
             if (p.length != 3) return null;
             return p[2] + "-" + p[1] + "-" + p[0];
-        } catch (Exception e) {
-            return null;
-        }
+        } catch (Exception e) { return null; }
     }
+
+    // ─── Visualizzatore immagine a schermo intero ──────────
     private void showFullImage(String imgUrl) {
         JDialog viewer = new JDialog(this, "Immagine allegata", true);
         viewer.setSize(700, 500);
@@ -438,7 +560,6 @@ public class IssueFormDialog extends JDialog {
                 java.awt.image.BufferedImage img =
                         javax.imageio.ImageIO.read(new java.net.URL(imgUrl));
                 if (img != null) {
-                    // scala mantenendo proporzioni
                     int maxW = 660, maxH = 440;
                     double scale = Math.min((double) maxW / img.getWidth(),
                             (double) maxH / img.getHeight());
@@ -448,9 +569,7 @@ public class IssueFormDialog extends JDialog {
                             img.getScaledInstance(w, h, Image.SCALE_SMOOTH));
                     SwingUtilities.invokeLater(() -> {
                         viewer.remove(loading);
-                        JLabel imgLbl = new JLabel(icon, SwingConstants.CENTER);
-                        viewer.add(imgLbl, BorderLayout.CENTER);
-
+                        viewer.add(new JLabel(icon, SwingConstants.CENTER), BorderLayout.CENTER);
                         JButton close = new JButton("✖ Chiudi");
                         close.setBackground(new Color(85, 0, 155));
                         close.setForeground(Color.WHITE);
@@ -466,13 +585,10 @@ public class IssueFormDialog extends JDialog {
                     });
                 }
             } catch (Exception ex) {
-                SwingUtilities.invokeLater(() -> {
-                    loading.setText("Errore caricamento immagine");
-                });
+                SwingUtilities.invokeLater(() -> loading.setText("Errore caricamento immagine"));
             }
         }).start();
 
         viewer.setVisible(true);
     }
-
 }

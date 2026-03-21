@@ -90,7 +90,7 @@ public class IssueService {
     // ── Modifica issue ─────────────────────────────────────
     public Issue updateIssue(Long issueId, String title, String description,
                              Issue.Status status, String requesterEmail,
-                             String imageUrl) {   // ← AGGIUNTO
+                             String imageUrl, String deadlineStr) { // ← aggiunto deadlineStr
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new RuntimeException("Issue non trovata"));
         User requester = userRepository.findByEmail(requesterEmail)
@@ -106,10 +106,12 @@ public class IssueService {
         if (title != null)       issue.setTitle(title);
         if (description != null) issue.setDescription(description);
         if (status != null)      issue.setStatus(status);
+        if (imageUrl != null && !imageUrl.isEmpty()) issue.setImageUrl(imageUrl);
 
-        // ← AGGIUNTO
-        if (imageUrl != null && !imageUrl.isEmpty())
-            issue.setImageUrl(imageUrl);
+        // ← salva la deadline se presente
+        if (deadlineStr != null && !deadlineStr.isEmpty()) {
+            issue.setDeadline(LocalDateTime.parse(deadlineStr + "T00:00:00"));
+        }
 
         return issueRepository.save(issue);
     }
