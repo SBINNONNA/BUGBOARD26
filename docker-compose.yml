@@ -1,10 +1,11 @@
-version: '3.8'
+version: "3.9"
 
 services:
 
   db:
-    image: postgres:15
+    image: postgres:16
     container_name: bugboard26-db
+    restart: always
     environment:
       POSTGRES_DB: bugboard26
       POSTGRES_USER: admin
@@ -12,7 +13,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U admin -d bugboard26"]
       interval: 10s
@@ -22,6 +23,10 @@ services:
   backend:
     build: .
     container_name: bugboard26-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "8081:8081"
     environment:
@@ -29,9 +34,12 @@ services:
       SPRING_DATASOURCE_USERNAME: admin
       SPRING_DATASOURCE_PASSWORD: secret
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
-    depends_on:
-      db:
-        condition: service_healthy
+      JWT_SECRET: bugboard26supersecretkey1234567890
+      JWT_EXPIRATION: 86400000
+      SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 100MB
+      SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 100MB
+    volumes:
+      - ./uploads:/app/uploads
 
 volumes:
-  pgdata:
+  db_data:
