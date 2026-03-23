@@ -11,17 +11,37 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+
+/**
+ * Controller REST per la gestione delle issue di un progetto.
+ * <p>
+ * Espone endpoint per creazione, ricerca, modifica, assegnazione,
+ * impostazione della scadenza, completamento ed eliminazione delle issue.
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/projects/{projectId}/issues")
 public class IssueController {
 
     private final IssueService issueService;
 
+    /**
+     * Crea un nuovo controller delle issue.
+     *
+     * @param issueService servizio applicativo per la gestione delle issue
+     */
     public IssueController(IssueService issueService) {
         this.issueService = issueService;
     }
 
-    // Requisito 2 — Crea issue (con assegnazione opzionale per admin)
+    /**
+     * Crea una nuova issue all'interno di un progetto.
+     *
+     * @param projectId   identificativo del progetto
+     * @param body        dati della issue in formato chiave/valore
+     * @param userDetails utente autenticato che richiede l'operazione
+     * @return la issue creata con stato HTTP 201 (CREATED)
+     */
     @PostMapping
     public ResponseEntity<Issue> createIssue(
             @PathVariable Long projectId,
@@ -40,15 +60,21 @@ public class IssueController {
                 Issue.Priority.valueOf(body.get("priority").toUpperCase()),
                 userDetails.getUsername(),
                 assignedToId,
-                body.get("imageUrl")   // ← AGGIUNTO
+                body.get("imageUrl")
         );
         return ResponseEntity.status(HttpStatus.CREATED).body(issue);
     }
 
-
-
-
-    // Requisito 3 — Vista issue con filtri
+    /**
+     * Restituisce l'elenco delle issue del progetto applicando eventuali filtri.
+     *
+     * @param projectId identificativo del progetto
+     * @param keyword   termine di ricerca su titolo e descrizione
+     * @param type      filtro per tipo issue
+     * @param status    filtro per stato issue
+     * @param priority  filtro per priorità issue
+     * @return lista delle issue filtrate
+     */
     @GetMapping
     public ResponseEntity<List<Issue>> getIssues(
             @PathVariable Long projectId,
@@ -62,12 +88,27 @@ public class IssueController {
         return ResponseEntity.ok(issueService.getIssues(projectId, keyword, issueType, issueStatus, issuePriority));
     }
 
-    // Singola issue per ID
+    /**
+     * Restituisce una singola issue in base al suo identificativo.
+     *
+     * @param projectId identificativo del progetto
+     * @param id        identificativo della issue
+     * @return la issue richiesta
+     */
     @GetMapping("/{id}")
     public ResponseEntity<Issue> getIssue(@PathVariable Long projectId, @PathVariable Long id) {
         return ResponseEntity.ok(issueService.getIssueById(id));
     }
 
+    /**
+     * Aggiorna i dati principali di una issue esistente.
+     *
+     * @param projectId   identificativo del progetto
+     * @param id          identificativo della issue
+     * @param body        dati aggiornati della issue
+     * @param userDetails utente autenticato che richiede l'operazione
+     * @return la issue aggiornata
+     */
     @PutMapping("/{id}")
     public ResponseEntity<Issue> updateIssue(
             @PathVariable Long projectId,
@@ -80,11 +121,19 @@ public class IssueController {
                 id, body.get("title"), body.get("description"),
                 status, userDetails.getUsername(),
                 body.get("imageUrl"),
-                body.get("deadline")); // ← aggiunto
+                body.get("deadline"));
         return ResponseEntity.ok(updated);
     }
 
-    // ✅ NUOVO — Assegna issue a un utente (solo admin)
+    /**
+     * Assegna una issue a un utente.
+     *
+     * @param projectId   identificativo del progetto
+     * @param id          identificativo della issue
+     * @param body        contenuto della richiesta con l'identificativo dell'utente assegnatario
+     * @param userDetails utente autenticato che richiede l'operazione
+     * @return la issue aggiornata
+     */
     @PatchMapping("/{id}/assign")
     public ResponseEntity<Issue> assignIssue(
             @PathVariable Long projectId,
@@ -96,7 +145,15 @@ public class IssueController {
         return ResponseEntity.ok(updated);
     }
 
-    // Requisito 18 — Imposta deadline
+    /**
+     * Imposta la data di scadenza di una issue.
+     *
+     * @param projectId   identificativo del progetto
+     * @param id          identificativo della issue
+     * @param body        contenuto della richiesta con la data di scadenza
+     * @param userDetails utente autenticato che richiede l'operazione
+     * @return la issue aggiornata
+     */
     @PatchMapping("/{id}/deadline")
     public ResponseEntity<Issue> setDeadline(
             @PathVariable Long projectId,
@@ -107,11 +164,43 @@ public class IssueController {
         Issue updated = issueService.setDeadline(id, deadline, userDetails.getUsername());
         return ResponseEntity.ok(updated);
     }
+
+    /**
+     * Segna una issue come completata.
+     *
+     * @param projectId identificativo del progetto
+     * @param issueId   identificativo della issue
+     * @param principal principale autenticato
+     * @return esito dell'operazione con la issue aggiornata
+     */
     @PatchMapping("/{issueId}/complete")
     public ResponseEntity<?> completeIssue(@PathVariable Long projectId,
                                            @PathVariable Long issueId,
                                            Principal principal) {
         return ResponseEntity.ok(issueService.completeIssue(issueId, principal.getName()));
     }
+
+    /**
+     * Elimina una issue completata.
+     *
+     * @param projectId   identificativo del progetto
+     * @param id          identificativo della issue
+     * @param userDetails utente autenticato che richiede l'operazione
+     * @return risposta senza contenuto con stato HTTP 204 (NO_CONTENT),
+     *         oppure un messaggio di errore con stato HTTP 403
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteIssue(
+            @PathVariable Long projectId,
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            issueService.deleteIssue(id, userDetails.getUsername());
+            return ResponseEntity.noContent().build();
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
+
 
 }

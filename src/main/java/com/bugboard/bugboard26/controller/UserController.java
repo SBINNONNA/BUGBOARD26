@@ -21,6 +21,14 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Controller REST per la gestione degli utenti.
+ * <p>
+ * Espone endpoint per ottenere il profilo dell'utente autenticato,
+ * elencare gli utenti, creare, aggiornare ed eliminare utenti e
+ * aggiornare la foto profilo.
+ * </p>
+ */
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -31,6 +39,15 @@ public class UserController {
     private final CommentRepository commentRepo;
     private final ProjectRepository projectRepo;
 
+    /**
+     * Crea un nuovo controller utenti.
+     *
+     * @param userRepo         repository degli utenti
+     * @param passwordEncoder  encoder per la cifratura delle password
+     * @param issueRepo        repository delle issue
+     * @param commentRepo      repository dei commenti
+     * @param projectRepo      repository dei progetti
+     */
     public UserController(UserRepository userRepo,
                           PasswordEncoder passwordEncoder,
                           IssueRepository issueRepo,
@@ -43,6 +60,12 @@ public class UserController {
         this.projectRepo     = projectRepo;
     }
 
+    /**
+     * Restituisce l'utente autenticato corrente.
+     *
+     * @param principal principale autenticato
+     * @return l'utente corrispondente all'email del principal
+     */
     @GetMapping("/me")
     public ResponseEntity<?> getMe(Principal principal) {
         User user = userRepo.findByEmail(principal.getName())
@@ -50,12 +73,29 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
+    /**
+     * Restituisce tutti gli utenti registrati.
+     * <p>
+     * L'operazione è riservata agli amministratori.
+     * </p>
+     *
+     * @return lista di tutti gli utenti
+     */
     @GetMapping
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<List<User>> getAll() {
         return ResponseEntity.ok(userRepo.findAll());
     }
 
+    /**
+     * Crea un nuovo utente.
+     * <p>
+     * L'operazione è riservata agli amministratori.
+     * </p>
+     *
+     * @param body dati dell'utente da creare, inclusi email, password e ruolo opzionale
+     * @return l'utente creato oppure un messaggio di errore
+     */
     @PostMapping
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> createUser(@RequestBody Map<String, String> body) {
@@ -85,6 +125,16 @@ public class UserController {
         }
     }
 
+    /**
+     * Aggiorna email e/o ruolo di un utente.
+     * <p>
+     * L'operazione è riservata agli amministratori.
+     * </p>
+     *
+     * @param id   identificativo dell'utente da aggiornare
+     * @param body dati da modificare
+     * @return l'utente aggiornato
+     */
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<?> update(@PathVariable Long id,
@@ -97,6 +147,15 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
+    /**
+     * Elimina un utente e rimuove i suoi riferimenti da commenti, issue e progetti.
+     * <p>
+     * L'operazione è riservata agli amministratori.
+     * </p>
+     *
+     * @param id identificativo dell'utente da eliminare
+     * @return risposta senza contenuto con stato HTTP 204 (NO_CONTENT)
+     */
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
@@ -133,14 +192,20 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Aggiorna foto profilo ──────────────────────────────
-    @PutMapping("/me/picture")   // ← era "/users/me/picture", corretto in "/me/picture"
+    /**
+     * Aggiorna la foto profilo dell'utente autenticato.
+     *
+     * @param body        mappa contenente l'URL della nuova immagine
+     * @param userDetails  dettagli dell'utente autenticato
+     * @return l'utente aggiornato con la nuova foto profilo
+     */
+    @PutMapping("/me/picture")
     public ResponseEntity<User> updatePicture(
             @RequestBody Map<String, String> body,
             @AuthenticationPrincipal UserDetails userDetails) {
-        User user = userRepo.findByEmail(userDetails.getUsername())  // ← era userRepository
+        User user = userRepo.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("Utente non trovato"));
         user.setProfilePicture(body.get("profilePicture"));
-        return ResponseEntity.ok(userRepo.save(user));               // ← era userRepository
+        return ResponseEntity.ok(userRepo.save(user));
     }
 }

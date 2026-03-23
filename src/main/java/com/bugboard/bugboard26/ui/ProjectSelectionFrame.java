@@ -43,14 +43,34 @@ public class ProjectSelectionFrame extends JFrame {
         allUsersBtn = new JButton("👥 Tutti gli Utenti");
         styleTopBtn(allUsersBtn);
         allUsersBtn.setVisible(false);
-        allUsersBtn.addActionListener(e -> new UtentiDialog(this, "ADMIN".equals(currentRole)).setVisible(true));
+        allUsersBtn.addActionListener(e ->
+                new UtentiDialog(this, "ADMIN".equals(currentRole)).setVisible(true));
 
         add(buildTopBar(),  BorderLayout.NORTH);
         add(buildContent(), BorderLayout.CENTER);
         fetchRoleAndProjects();
     }
 
-    // ─── TOP BAR ────────────────────────────────────────────
+    // ── Logo da /logo.png ──────────────────────────────────
+    private JLabel buildLogo(int width, int height) {
+        try {
+            java.io.InputStream is = getClass().getResourceAsStream("/logo.png");
+            if (is != null) {
+                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(is);
+                ImageIcon icon = new ImageIcon(
+                        img.getScaledInstance(width, height, Image.SCALE_SMOOTH));
+                JLabel lbl = new JLabel(icon);
+                lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                return lbl;
+            }
+        } catch (Exception ignored) {}
+        JLabel lbl = new JLabel("BugBoard26", SwingConstants.CENTER);
+        lbl.setFont(new Font("SansSerif", Font.BOLD, 18));
+        lbl.setForeground(Color.WHITE);
+        return lbl;
+    }
+
+    // ─── TOP BAR ──────────────────────────────────────────────
     private JPanel buildTopBar() {
         JPanel bar = new JPanel(new BorderLayout());
         bar.setBackground(new Color(70, 0, 130));
@@ -58,7 +78,7 @@ public class ProjectSelectionFrame extends JFrame {
 
         JPanel left = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
         left.setOpaque(false);
-        left.add(new LogoPanel(false));
+        left.add(buildLogo(50, 38));
         JLabel title = new JLabel("BugBoard26");
         title.setFont(new Font("SansSerif", Font.BOLD, 20));
         title.setForeground(Color.WHITE);
@@ -82,7 +102,7 @@ public class ProjectSelectionFrame extends JFrame {
         return bar;
     }
 
-    // ─── CONTENUTO ──────────────────────────────────────────
+    // ─── CONTENUTO ────────────────────────────────────────────
     private JPanel buildContent() {
         JPanel outer = new JPanel(new BorderLayout());
         outer.setBackground(BG);
@@ -93,7 +113,7 @@ public class ProjectSelectionFrame extends JFrame {
         headerRow.setBorder(BorderFactory.createEmptyBorder(0, 0, 20, 0));
 
         JLabel heading = new JLabel("Seleziona un progetto");
-        heading.setFont(new Font("SansSerif", Font.BOLD, 26));
+        heading.setFont(new Font("Trebuchet MS", Font.BOLD, 26));
         heading.setForeground(new Color(50, 0, 90));
 
         JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
@@ -119,7 +139,7 @@ public class ProjectSelectionFrame extends JFrame {
         return outer;
     }
 
-    // ─── CARICAMENTO ─────────────────────────────────────────
+    // ─── CARICAMENTO ──────────────────────────────────────────
     private void fetchRoleAndProjects() {
         new SwingWorker<Object[], Void>() {
             @Override
@@ -131,7 +151,6 @@ public class ProjectSelectionFrame extends JFrame {
 
                 long myId = me.get("id").asLong();
 
-                // Per ogni progetto controlla se l'utente ha issue assegnate
                 Set<Long> projectsWithMyIssues = new HashSet<>();
                 for (JsonNode p : projects) {
                     long projId = p.get("id").asLong();
@@ -148,7 +167,6 @@ public class ProjectSelectionFrame extends JFrame {
                         }
                     } catch (Exception ignored) {}
                 }
-
                 return new Object[]{me, projects, projectsWithMyIssues};
             }
 
@@ -156,9 +174,9 @@ public class ProjectSelectionFrame extends JFrame {
             @SuppressWarnings("unchecked")
             protected void done() {
                 try {
-                    Object[]  results  = get();
-                    JsonNode  me       = (JsonNode) results[0];
-                    JsonNode  arr      = (JsonNode) results[1];
+                    Object[]  results    = get();
+                    JsonNode  me         = (JsonNode) results[0];
+                    JsonNode  arr        = (JsonNode) results[1];
                     Set<Long> myProjects = (Set<Long>) results[2];
 
                     String rawRole = "";
@@ -206,7 +224,7 @@ public class ProjectSelectionFrame extends JFrame {
         card.setBackground(CARD_BG);
         card.setBorder(BorderFactory.createCompoundBorder(
                 new RoundedBorder(18, hasAssignedIssues
-                        ? new Color(255, 200, 0)      // ← bordo giallo se ha issue
+                        ? new Color(255, 200, 0)
                         : new Color(120, 60, 190)),
                 BorderFactory.createEmptyBorder(18, 20, 18, 20)
         ));
@@ -438,8 +456,7 @@ public class ProjectSelectionFrame extends JFrame {
         f.setFont(new Font("SansSerif", Font.PLAIN, 13));
         f.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(new Color(190, 150, 240), 1, true),
-                BorderFactory.createEmptyBorder(4, 8, 4, 8)
-        ));
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)));
     }
 
     private void styleField(JPasswordField f) {
@@ -448,7 +465,6 @@ public class ProjectSelectionFrame extends JFrame {
         f.setFont(new Font("SansSerif", Font.PLAIN, 13));
         f.setBorder(BorderFactory.createCompoundBorder(
                 new LineBorder(new Color(190, 150, 240), 1, true),
-                BorderFactory.createEmptyBorder(4, 8, 4, 8)
-        ));
+                BorderFactory.createEmptyBorder(4, 8, 4, 8)));
     }
 }

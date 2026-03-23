@@ -72,17 +72,36 @@ public class DashboardFrame extends JFrame {
         }.execute();
     }
 
+    // ─── LOGO da resources ─────────────────────────────────
+    private JLabel buildLogo(int width, int height) {
+        try {
+            java.io.InputStream is = getClass().getResourceAsStream("/logo.png");
+            if (is != null) {
+                java.awt.image.BufferedImage img = javax.imageio.ImageIO.read(is);
+                ImageIcon icon = new ImageIcon(
+                        img.getScaledInstance(width, height, Image.SCALE_SMOOTH));
+                JLabel lbl = new JLabel(icon);
+                lbl.setHorizontalAlignment(SwingConstants.CENTER);
+                return lbl;
+            }
+        } catch (Exception ignored) {}
+        JLabel lbl = new JLabel("BugBoard26", SwingConstants.CENTER);
+        lbl.setFont(new Font("SansSerif", Font.BOLD, 18));
+        lbl.setForeground(new Color(80, 0, 150));
+        return lbl;
+    }
+
     // ─── SIDEBAR ───────────────────────────────────────────
     private JPanel buildSidebar() {
         JPanel sb = new JPanel();
         sb.setLayout(new BoxLayout(sb, BoxLayout.Y_AXIS));
         sb.setBackground(SIDEBAR_BG);
         sb.setPreferredSize(new Dimension(200, 0));
-        sb.setBorder(BorderFactory.createEmptyBorder(30, 15, 25, 15));
+        sb.setBorder(BorderFactory.createEmptyBorder(20, 10, 25, 10));
 
-        JPanel av = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JPanel av = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 8));
         av.setOpaque(false);
-        av.add(new AvatarPanel(80));
+        av.add(new AvatarPanel(120));
         sb.add(av);
         sb.add(Box.createVerticalStrut(10));
 
@@ -114,13 +133,13 @@ public class DashboardFrame extends JFrame {
         sb.add(sideBtn("CALENDARIO", e -> new CalendarioDialog(this).setVisible(true)));
         sb.add(Box.createVerticalGlue());
 
-        sb.add(sideBtn("◀ Progetti", e -> {
+        sb.add(sideBtn("< Progetti", e -> {
             dispose();
             new ProjectSelectionFrame().setVisible(true);
         }));
         sb.add(Box.createVerticalStrut(8));
 
-        JButton logout = sideBtn("⬅  Logout", e -> {
+        JButton logout = sideBtn("Logout", e -> {
             ApiClient.setToken(null);
             dispose();
             new LoginFrame().setVisible(true);
@@ -152,7 +171,7 @@ public class DashboardFrame extends JFrame {
     private JPanel buildMain() {
         JPanel main = new JPanel(new BorderLayout());
         main.setBackground(MAIN_BG);
-        main.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        main.setBorder(BorderFactory.createEmptyBorder(14, 20, 20, 20));
 
         JPanel top = new JPanel(new BorderLayout());
         top.setOpaque(false);
@@ -161,10 +180,10 @@ public class DashboardFrame extends JFrame {
         JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
         titleRow.setOpaque(false);
         JLabel b1 = new JLabel("Board:");
-        b1.setFont(new Font("SansSerif", Font.BOLD, 30));
+        b1.setFont(new Font("Trebuchet MS", Font.BOLD, 40));
         b1.setForeground(new Color(55, 0, 100));
         JLabel b2 = new JLabel(ApiClient.getCurrentProjectName());
-        b2.setFont(new Font("SansSerif", Font.BOLD, 30));
+        b2.setFont(new Font("Trebuchet MS", Font.BOLD, 40));
         b2.setForeground(new Color(210, 185, 240));
         titleRow.add(b1); titleRow.add(b2);
 
@@ -185,7 +204,7 @@ public class DashboardFrame extends JFrame {
                 new javax.swing.border.LineBorder(new Color(190, 150, 240), 1, true),
                 BorderFactory.createEmptyBorder(4, 8, 4, 8)));
 
-        JLabel priLbl = new JLabel("Priorità:");
+        JLabel priLbl = new JLabel("Priorita:");
         priLbl.setForeground(new Color(55, 0, 100));
         priLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
 
@@ -193,15 +212,15 @@ public class DashboardFrame extends JFrame {
         typeLbl.setForeground(new Color(55, 0, 100));
         typeLbl.setFont(new Font("SansSerif", Font.BOLD, 12));
 
-        onlyMineBox = new JCheckBox("📌 Solo le mie");
+        onlyMineBox = new JCheckBox("Solo le mie");
         onlyMineBox.setBackground(MAIN_BG);
         onlyMineBox.setForeground(new Color(55, 0, 100));
         onlyMineBox.setFont(new Font("SansSerif", Font.BOLD, 12));
         onlyMineBox.setFocusPainted(false);
         onlyMineBox.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
-        JButton cerca = topBtn("🔍 Cerca");
-        JButton nuova = topBtn("＋ Issue");
+        JButton cerca = topBtn("Cerca");
+        JButton nuova = topBtn("+ Issue");
         cerca.addActionListener(e -> loadIssues());
         nuova.addActionListener(e -> {
             new IssueFormDialog(this, null).setVisible(true);
@@ -221,11 +240,14 @@ public class DashboardFrame extends JFrame {
         JPanel titleBlock = new JPanel(new BorderLayout());
         titleBlock.setOpaque(false);
         titleBlock.add(titleRow,  BorderLayout.NORTH);
-        titleBlock.add(filterRow, BorderLayout.SOUTH);
-
-        JPanel logoP = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel filterWrap = new JPanel(new BorderLayout());
+        filterWrap.setOpaque(false);
+        filterWrap.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        filterWrap.add(filterRow, BorderLayout.CENTER);
+        titleBlock.add(filterWrap, BorderLayout.SOUTH);
+        JPanel logoP = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         logoP.setOpaque(false);
-        logoP.add(new LogoPanel(false));
+        logoP.add(buildLogo(90, 70));
 
         top.add(titleBlock, BorderLayout.WEST);
         top.add(logoP,      BorderLayout.EAST);
@@ -245,7 +267,6 @@ public class DashboardFrame extends JFrame {
         return b;
     }
 
-    // ── styleCombo con renderer viola ──────────────────────
     private void styleCombo(JComboBox<String> box) {
         Color bg      = new Color(110, 20, 180);
         Color bgHover = new Color(140, 50, 210);
@@ -258,7 +279,8 @@ public class DashboardFrame extends JFrame {
         box.setRenderer(new DefaultListCellRenderer() {
             @Override
             public Component getListCellRendererComponent(JList<?> list, Object value,
-                                                          int index, boolean isSelected, boolean cellHasFocus) {
+                                                          int index, boolean isSelected,
+                                                          boolean cellHasFocus) {
                 JLabel lbl = (JLabel) super.getListCellRendererComponent(
                         list, value, index, isSelected, cellHasFocus);
                 lbl.setBackground(isSelected ? bgHover : bg);
@@ -276,10 +298,8 @@ public class DashboardFrame extends JFrame {
                 JButton btn = new JButton() {
                     @Override
                     protected void paintComponent(Graphics g) {
-                        // sfondo viola
                         g.setColor(new Color(140, 50, 210));
                         g.fillRect(0, 0, getWidth(), getHeight());
-                        // freccia bianca disegnata a mano
                         Graphics2D g2 = (Graphics2D) g;
                         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING,
                                 RenderingHints.VALUE_ANTIALIAS_ON);
@@ -293,13 +313,11 @@ public class DashboardFrame extends JFrame {
                 };
                 btn.setBorder(BorderFactory.createEmptyBorder());
                 btn.setFocusPainted(false);
-                btn.setContentAreaFilled(false); // ← lascia che paintComponent faccia tutto
+                btn.setContentAreaFilled(false);
                 btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
                 return btn;
             }
 
-
-            // ← fix: forza colore testo anche nella casella chiusa
             @Override
             public void paintCurrentValue(Graphics g, Rectangle bounds, boolean hasFocus) {
                 ListCellRenderer<Object> renderer = comboBox.getRenderer();
@@ -324,7 +342,6 @@ public class DashboardFrame extends JFrame {
         });
     }
 
-
     // ─── KANBAN ────────────────────────────────────────────
     private JPanel buildKanban() {
         JPanel board = new JPanel(new GridLayout(1, 3, 14, 0));
@@ -348,7 +365,7 @@ public class DashboardFrame extends JFrame {
 
     private JScrollPane colWrapper(String title, Color tc, JPanel content) {
         JLabel hdr = new JLabel(title, SwingConstants.CENTER);
-        hdr.setFont(new Font("SansSerif", Font.BOLD, 14));
+        hdr.setFont(new Font("Trebuchet MS", Font.BOLD, 14));
         hdr.setForeground(tc);
         hdr.setBorder(BorderFactory.createEmptyBorder(10, 0, 10, 0));
         hdr.setOpaque(true);
@@ -361,6 +378,7 @@ public class DashboardFrame extends JFrame {
         scroll.getViewport().setBackground(COL_BG);
         return scroll;
     }
+
 
     // ─── CARICAMENTO ISSUE ─────────────────────────────────
     void loadIssues() {
@@ -456,6 +474,7 @@ public class DashboardFrame extends JFrame {
         card.setMaximumSize(new Dimension(Integer.MAX_VALUE, 110));
         card.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
+        // ── Riga titolo ──
         JPanel topRow = new JPanel(new BorderLayout());
         topRow.setOpaque(false);
 
@@ -464,7 +483,7 @@ public class DashboardFrame extends JFrame {
         if (isAssignedToMe) {
             JLabel flag = new JLabel("📌");
             flag.setFont(new Font("SansSerif", Font.PLAIN, 13));
-            flag.setToolTipText("Questa issue è assegnata a te");
+            flag.setToolTipText("Questa issue e' assegnata a te");
             titlePanel.add(flag);
         }
         JLabel titleLbl = new JLabel("#" + id + "  " + title);
@@ -473,14 +492,23 @@ public class DashboardFrame extends JFrame {
         titlePanel.add(titleLbl);
         topRow.add(titlePanel, BorderLayout.WEST);
 
-        JLabel typeLbl = new JLabel(type);
+        // ── Tipo con icona ──
+        String typeIcon = switch (type) {
+            case "BUG"           -> "🐛 BUG";
+            case "FEATURE"       -> "✨ FEATURE";
+            case "QUESTION"      -> "❓ QUESTION";
+            case "DOCUMENTATION" -> "📄 DOCUMENTATION";
+            default              -> type;
+        };
+        JLabel typeLbl = new JLabel(typeIcon);
         typeLbl.setFont(new Font("SansSerif", Font.PLAIN, 12));
         typeLbl.setForeground(new Color(220, 200, 255));
 
+        // ── Riga bottom: commenti + priorità ──
         JPanel botRow = new JPanel(new BorderLayout());
         botRow.setOpaque(false);
 
-        JLabel commentIcon = new JLabel("💬 " + commentCount);
+        JLabel commentIcon = new JLabel("💬 " + commentCount);  // ← ripristinato + icona
         commentIcon.setForeground(Color.WHITE);
         commentIcon.setFont(new Font("SansSerif", Font.PLAIN, 12));
 

@@ -8,6 +8,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+/**
+ * Servizio per la gestione dell'autenticazione e della registrazione utenti.
+ */
 @Service
 public class AuthService {
 
@@ -16,6 +19,14 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final AuthenticationManager authenticationManager;
 
+    /**
+     * Costruttore con iniezione delle dipendenze.
+     *
+     * @param userRepository       repository per l'accesso agli utenti
+     * @param passwordEncoder      encoder per la cifratura delle password
+     * @param jwtUtil              utility per la generazione del token JWT
+     * @param authenticationManager gestore dell'autenticazione Spring
+     */
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtUtil jwtUtil,
@@ -26,6 +37,15 @@ public class AuthService {
         this.authenticationManager = authenticationManager;
     }
 
+    /**
+     * Autentica un utente tramite email e password e genera un token JWT.
+     *
+     * @param email    email dell'utente
+     * @param password password in chiaro
+     * @return token JWT generato per l'utente autenticato
+     * @throws org.springframework.security.core.AuthenticationException
+     *         se le credenziali non sono valide
+     */
     public String login(String email, String password) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(email, password)
@@ -33,6 +53,15 @@ public class AuthService {
         return jwtUtil.generateToken(email);
     }
 
+    /**
+     * Registra un nuovo utente nel sistema.
+     *
+     * @param email    email del nuovo utente
+     * @param password password in chiaro (verrà cifrata con BCrypt)
+     * @param role     ruolo assegnato al nuovo utente
+     * @return l'entità {@link User} salvata nel database
+     * @throws RuntimeException se l'email è già in uso
+     */
     public User register(String email, String password, User.Role role) {
         if (userRepository.existsByEmail(email)) {
             throw new RuntimeException("Email già in uso");

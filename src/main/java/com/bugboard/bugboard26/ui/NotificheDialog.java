@@ -6,7 +6,6 @@ import java.awt.*;
 
 public class NotificheDialog extends JDialog {
 
-    // ← persiste per tutta la sessione, si resetta al logout
     static final java.util.Set<String> dismissedComments = new java.util.HashSet<>();
 
     public NotificheDialog(DashboardFrame parent) {
@@ -64,12 +63,9 @@ public class NotificheDialog extends JDialog {
                     JsonNode comments = ApiClient.mapper.readTree(cResp);
                     for (JsonNode c : comments) {
                         String commentId = c.get("id").asText();
-
-                        // ← salta se già dismissato
                         if (dismissedComments.contains(commentId)) continue;
-
                         addDismissibleCard(listPanel,
-                                "  [#" + iss.get("id").asText() + "] "
+                                "[#" + iss.get("id").asText() + "] "
                                         + c.path("author").path("email").asText()
                                         + ": " + c.get("text").asText(),
                                 new Color(155, 100, 215),
@@ -92,19 +88,8 @@ public class NotificheDialog extends JDialog {
         scroll.getVerticalScrollBar().setUnitIncrement(14);
         scroll.getViewport().setBackground(new Color(150, 95, 205));
 
-        JButton close = new JButton("Chiudi");
-        close.setBackground(new Color(85, 0, 155));
-        close.setForeground(Color.WHITE);
-        close.setFocusPainted(false);
-        close.setBorderPainted(false);
-        close.addActionListener(e -> dispose());
-        JPanel footer = new JPanel(new FlowLayout(FlowLayout.CENTER));
-        footer.setBackground(new Color(90, 0, 160));
-        footer.add(close);
-
         add(title,  BorderLayout.NORTH);
         add(scroll, BorderLayout.CENTER);
-        add(footer, BorderLayout.SOUTH);
     }
 
     // ── card semplice (solo testo) ─────────────────────────
@@ -118,26 +103,33 @@ public class NotificheDialog extends JDialog {
                 new RoundedBorder(10, new Color(130, 80, 190)),
                 BorderFactory.createEmptyBorder(8, 12, 8, 12)));
         lbl.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        lbl.setAlignmentX(Component.LEFT_ALIGNMENT); // ← allineamento sinistro
         p.add(lbl);
         p.add(Box.createVerticalStrut(6));
     }
 
-    // ── card con X disegnata a mano ────────────────────────
+    // ── card dismissibile con testo wrappato ───────────────
     private void addDismissibleCard(JPanel p, String text, Color bg, String commentId) {
         JPanel row = new JPanel(new BorderLayout(6, 0));
         row.setOpaque(true);
         row.setBackground(bg);
-        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        row.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
         row.setBorder(BorderFactory.createCompoundBorder(
                 new RoundedBorder(10, new Color(130, 80, 190)),
-                BorderFactory.createEmptyBorder(6, 12, 6, 6)));
+                BorderFactory.createEmptyBorder(8, 12, 8, 8)));
+        row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        JLabel lbl = new JLabel(text);
+        JTextArea lbl = new JTextArea(text);
         lbl.setFont(new Font("SansSerif", Font.PLAIN, 12));
         lbl.setForeground(Color.WHITE);
+        lbl.setBackground(bg);
         lbl.setOpaque(false);
+        lbl.setEditable(false);
+        lbl.setFocusable(false);
+        lbl.setLineWrap(true);
+        lbl.setWrapStyleWord(true);
+        lbl.setBorder(null);
 
-        // ← X disegnata a mano, funziona su tutti i sistemi
         JButton del = new JButton() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -158,10 +150,17 @@ public class NotificheDialog extends JDialog {
         del.setBorderPainted(false);
         del.setFocusPainted(false);
         del.setPreferredSize(new Dimension(28, 24));
+        del.setMinimumSize(new Dimension(28, 24));
+        del.setMaximumSize(new Dimension(28, 24));
         del.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
+        // ← pannello wrapper che ancora il bottone in alto a destra
+        JPanel delWrapper = new JPanel(new BorderLayout());
+        delWrapper.setOpaque(false);
+        delWrapper.add(del, BorderLayout.NORTH); // ← NORTH: bottone resta piccolo in alto
+
         del.addActionListener(e -> {
-            dismissedComments.add(commentId); // ← memorizza per questa sessione
+            dismissedComments.add(commentId);
             Component[] comps = p.getComponents();
             for (int i = 0; i < comps.length; i++) {
                 if (comps[i] == row) {
@@ -175,9 +174,10 @@ public class NotificheDialog extends JDialog {
             p.repaint();
         });
 
-        row.add(lbl, BorderLayout.CENTER);
-        row.add(del, BorderLayout.EAST);
+        row.add(lbl,        BorderLayout.CENTER);
+        row.add(delWrapper, BorderLayout.EAST); // ← wrapper invece del bottone diretto
         p.add(row);
         p.add(Box.createVerticalStrut(6));
     }
+
 }

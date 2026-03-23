@@ -12,16 +12,40 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Configurazione della sicurezza Spring Security.
+ * <p>
+ * Definisce la catena di filtri HTTP, la politica di sessione stateless,
+ * le regole di autorizzazione e il filtro JWT.
+ * </p>
+ */
 @EnableMethodSecurity
 @Configuration
 public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
 
+    /**
+     * Costruttore con iniezione del filtro JWT.
+     *
+     * @param jwtFilter filtro per la validazione del token JWT
+     */
     public SecurityConfig(JwtFilter jwtFilter) {
         this.jwtFilter = jwtFilter;
     }
 
+    /**
+     * Configura la catena di filtri di sicurezza HTTP.
+     * <p>
+     * Disabilita CSRF, imposta la sessione come stateless,
+     * permette l'accesso pubblico a {@code /api/auth/**} e {@code /uploads/**}
+     * e richiede autenticazione per tutte le altre richieste.
+     * </p>
+     *
+     * @param http configurazione della sicurezza HTTP
+     * @return la catena di filtri configurata
+     * @throws Exception in caso di errori di configurazione
+     */
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
@@ -35,11 +59,23 @@ public class SecurityConfig {
         return http.build();
     }
 
+    /**
+     * Bean per la codifica delle password con BCrypt.
+     *
+     * @return encoder BCrypt
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
+    /**
+     * Espone l'{@link AuthenticationManager} come bean Spring.
+     *
+     * @param config configurazione di autenticazione di Spring
+     * @return il gestore di autenticazione
+     * @throws Exception in caso di errori di configurazione
+     */
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config) throws Exception {
