@@ -14,6 +14,8 @@ public class BugBoard26Application {
         SpringApplication app = new SpringApplication(BugBoard26Application.class);
         app.setHeadless(false);
         app.run(args);
+
+
     }
 }
 
