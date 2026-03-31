@@ -1,0 +1,113 @@
+
+╔══════════════════════════════════════════════════════════════════╗
+║              BUGBOARD26 — COMANDI MAKEFILE                      ║
+╚══════════════════════════════════════════════════════════════════╝
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  MAKE TARGETS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  make up
+      Builda e avvia db + backend + sonarqube in background.
+      Aspetta 8 secondi, poi apre il frontend Swing.
+      → Usa questa la PRIMA volta o dopo modifiche al codice.
+
+  make run
+      Avvia db + backend senza rebuildarli.
+      Aspetta 5 secondi, poi apre il frontend Swing.
+      → Usa questa per i lanci veloci del giorno successivo.
+
+  make down
+      Ferma e rimuove tutti i container.
+
+  make build
+      Rebuilda SOLO il container backend (senza riavviare).
+
+  make logs
+      Mostra le ultime 50 righe di log di tutti i container
+      e continua a seguirli in tempo reale.
+      → Premi CTRL+C per uscire.
+
+  make shell-backend
+      Apre una shell sh dentro il container backend.
+
+  make shell-db
+      Apre psql dentro il container db.
+      Connessione: utente=admin, database=bugboard26.
+
+  make test
+      Esegue tutti i test Maven con mvnw.cmd.
+
+  make ui
+      Lancia SOLO il frontend Swing senza toccare Docker.
+      → Utile se hai chiuso la finestra per sbaglio.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  FLUSSO DI LAVORO TIPICO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Prima volta o dopo modifiche al codice:
+      make up
+
+  Tutti i giorni successivi (già buildato):
+      make run
+
+  Hai chiuso la finestra Swing per sbaglio:
+      make ui
+
+  Vuoi vedere cosa sta facendo il backend:
+      make logs
+
+  Fine sessione:
+      make down
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  COMANDI DOCKER DIRETTI (senza Make)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Avvia tutto:
+      docker compose up --build -d
+
+  Ferma tutto:
+      docker compose down
+
+  Ferma tutto e cancella i volumi (reset db):
+      docker compose down -v
+
+  Vedi i container attivi:
+      docker compose ps
+
+  Log solo del backend:
+      docker compose logs -f backend
+
+  Log solo del db:
+      docker compose logs -f db
+
+  Riavvia solo il backend:
+      docker compose restart backend
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  COMANDI MAVEN DIRETTI (senza Make)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Esegui i test:
+      .\mvnw.cmd test
+
+  Esegui un singolo test:
+      .\mvnw.cmd test -Dtest=AuthServiceTest
+
+  Compila senza test:
+      .\mvnw.cmd package -DskipTests
+
+  Avvia il frontend Swing:
+      .\mvnw.cmd exec:java -Dexec.mainClass=com.bugboard.bugboard26.ui.SwingApp
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  PORTE USATE DAL PROGETTO
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Backend  →  http://localhost:8081
+  Database →  localhost:5432
+  SonarQube→  http://localhost:9000
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
