@@ -1,4 +1,5 @@
-SHELL      := /bin/sh
+SHELL      := powershell.exe
+.SHELLFLAGS := -NoProfile -Command
 COMPOSE    := docker compose
 UI_CLASS   := com.bugboard.bugboard26.ui.SwingApp
 
@@ -7,16 +8,16 @@ UI_CLASS   := com.bugboard.bugboard26.ui.SwingApp
 # Avvia tutto (db + backend), poi apre il frontend Swing
 up:
 	$(COMPOSE) up --build -d
-	@echo "⏳ Attendo avvio backend..."
-	@sleep 8
-	@mvn exec:java -Dexec.mainClass="$(UI_CLASS)" -q &
+	Write-Host "⏳ Attendo avvio backend..."
+	Start-Sleep -Seconds 5
+	Start-Process -NoNewWindow -FilePath ".\mvnw.cmd" -ArgumentList "exec:java", "-Dexec.mainClass=$(UI_CLASS)", "-q"
 
 # Avvia senza rebuild (lanci successivi) e apre il frontend Swing
 run:
 	$(COMPOSE) up -d
-	@echo "⏳ Attendo avvio backend..."
-	@sleep 5
-	@mvn exec:java -Dexec.mainClass="$(UI_CLASS)" -q &
+	Write-Host "⏳ Attendo avvio backend..."
+	Start-Sleep -Seconds 5
+	Start-Process -NoNewWindow -FilePath ".\mvnw.cmd" -ArgumentList "exec:java", "-Dexec.mainClass=$(UI_CLASS)", "-q"
 
 # Ferma tutto
 down:
@@ -44,4 +45,4 @@ test:
 
 # Lancia solo il frontend Swing (senza toccare Docker)
 ui:
-	@mvn exec:java -Dexec.mainClass="$(UI_CLASS)" -q &
+	Start-Process -NoNewWindow -FilePath ".\mvnw.cmd" -ArgumentList "exec:java", "-Dexec.mainClass=$(UI_CLASS)", "-q"
