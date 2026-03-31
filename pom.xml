@@ -8,10 +8,9 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.4.3</version>  <!-- ✅ versione corretta -->
+        <version>3.4.3</version>
         <relativePath/>
     </parent>
-
 
     <groupId>com.bugboard</groupId>
     <artifactId>BugBoard26</artifactId>
@@ -23,15 +22,16 @@
         <java.version>17</java.version>
         <sonar.projectKey>bugboard26</sonar.projectKey>
         <sonar.host.url>http://localhost:9000</sonar.host.url>
-        <sonar.token>sqp_3c946de03e1fc5b4d311fd81be3e73b0afa12eec</sonar.token>
+        <sonar.junit.reportPaths>target/surefire-reports</sonar.junit.reportPaths>
     </properties>
+
 
     <dependencies>
 
         <!-- Web (REST API) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>  <!-- ✅ non webmvc -->
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
         <!-- JPA + Hibernate -->
@@ -78,7 +78,7 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Test (unica dipendenza test necessaria) ✅ -->
+        <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -89,28 +89,32 @@
 
     <build>
         <plugins>
+
+            <!-- Build JAR -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
+
+            <!-- Fix Java 25 + Mockito/ByteBuddy -->
             <plugin>
-                <groupId>org.jacoco</groupId>
-                <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>prepare-agent</goal>
-                        </goals>
-                    </execution>
-                    <execution>
-                        <id>report</id>
-                        <phase>verify</phase>
-                        <goals>
-                            <goal>report</goal>
-                        </goals>
-                    </execution>
-                </executions>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <argLine>
+                        -Dnet.bytebuddy.experimental=true
+                        -XX:+EnableDynamicAgentLoading
+                        --add-opens java.base/java.lang=ALL-UNNAMED
+                        --add-opens java.base/java.util=ALL-UNNAMED
+                    </argLine>
+                </configuration>
+            </plugin>
+
+            <!-- SonarQube -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>4.0.0.4121</version>
             </plugin>
 
         </plugins>
